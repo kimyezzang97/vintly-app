@@ -31,13 +31,16 @@ class TokenStorage {
 
   // ---------------------------------------------------------------------------
   // FlutterSecureStorage 인스턴스
-  // Android 옵션: encryptedSharedPreferences 대신 더 안전한 방식 사용 (기본값)
-  // iOS 옵션: accessibility는 기본값으로 두면 앱이 포그라운드일 때만 접근 가능
+  // - 보관 기간: 앱에서 만료를 두지 않음. 앱 삭제 또는 clearAll() 전까지 유지.
+  // - Android: 에뮬레이터 재부팅 시 일부 환경에서 KeyStore 준비 전 읽기 오류가 나면
+  //   resetOnError: true(기본)일 때 저장소가 비워질 수 있음. false로 두어 오류 시에도
+  //   데이터를 지우지 않고 유지하도록 함 (실기기/에뮬 모두 재시작 후 로그인 유지에 유리).
+  // - iOS: 기본값 사용.
   // ---------------------------------------------------------------------------
   static const FlutterSecureStorage _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
-      // 앱 전용 저장소 사용. 백업 제외 시 다른 앱/백업에서 읽을 수 없음
       encryptedSharedPreferences: true,
+      resetOnError: false,
     ),
   );
 
