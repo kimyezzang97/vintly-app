@@ -240,126 +240,134 @@ class _VintageListScreenState extends State<VintageListScreen> {
             ],
           ),
           child: StatefulBuilder(
-            builder: (context, setStateSB) => SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: cs.outline.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (detail.imgList.isNotEmpty) ...[
-                    _VintageDetailImageCarousel(
-                      imgList: detail.imgList,
-                      baseUrl: AppConfig.instance.backend.baseUrl,
-                      imagePlaceholder: _imagePlaceholder(),
-                      shopName: detail.name,
-                      likeCount: likeCount,
-                      liked: liked,
-                      likeLoading: likeLoading,
-                      onToggleLike: () async {
-                        if (likeLoading) return;
-                        setStateSB(() => likeLoading = true);
-                        final result = await _toggleLike(
-                          vintageId: detail.vintageId,
-                          currentLiked: liked,
-                        );
-                        if (!context.mounted) return;
-                        setStateSB(() {
-                          likeLoading = false;
-                          if (result != null) {
-                            liked = result.$1;
-                            likeCount = result.$2;
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                  ] else ...[
-                    _imagePlaceholder(),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: cs.primary.withValues(alpha: 0.3), width: 1),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              detail.name,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                          ),
-                          if (likeLoading)
-                            const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            Icon(
-                              liked ? Icons.favorite : Icons.favorite_border,
-                              color: liked ? Colors.red.shade600 : cs.outline,
-                              size: 20,
-                            ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$likeCount',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // 주소
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: cs.secondaryContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.location_on_outlined, size: 20, color: cs.secondary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            detail.address,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              height: 1.35,
-                            ),
+            builder: (context, setStateSB) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 고정: 핸들 + 이미지 + 주소
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: cs.outline.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (detail.imgList.isNotEmpty) ...[
+                        _VintageDetailImageCarousel(
+                          imgList: detail.imgList,
+                          baseUrl: AppConfig.instance.backend.baseUrl,
+                          imagePlaceholder: _imagePlaceholder(),
+                          shopName: detail.name,
+                          likeCount: likeCount,
+                          liked: liked,
+                          likeLoading: likeLoading,
+                          onToggleLike: () async {
+                            if (likeLoading) return;
+                            setStateSB(() => likeLoading = true);
+                            final result = await _toggleLike(
+                              vintageId: detail.vintageId,
+                              currentLiked: liked,
+                            );
+                            if (!context.mounted) return;
+                            setStateSB(() {
+                              likeLoading = false;
+                              if (result != null) {
+                                liked = result.$1;
+                                likeCount = result.$2;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                      ] else ...[
+                        _imagePlaceholder(),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cs.primary.withValues(alpha: 0.3), width: 1),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  detail.name,
+                                  style: theme.textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                              ),
+                              if (likeLoading)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                Icon(
+                                  liked ? Icons.favorite : Icons.favorite_border,
+                                  color: liked ? Colors.red.shade600 : cs.outline,
+                                  size: 20,
+                                ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$likeCount',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
                       ],
-                    ),
+                      // 주소
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: cs.secondaryContainer.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 20, color: cs.secondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                detail.address,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-
-                  // 댓글 (블록 없이 제목 + 리스트 + 입력)
-                  _CommentSection(
+                ),
+                // 스크롤: 댓글만
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                    child: _CommentSection(
                     detail: updatedDetail ?? detail,
                     replyingTo: replyingTo,
                     commentController: commentController,
@@ -441,8 +449,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
                       );
                     },
                   ),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
