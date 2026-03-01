@@ -12,7 +12,9 @@
 
 import 'package:flutter/material.dart';
 
+import 'app_config.dart';
 import 'app_routes.dart';
+import '../shared/auth/current_user.dart';
 import '../shared/auth/token_storage.dart';
 
 class RootScreen extends StatefulWidget {
@@ -26,7 +28,6 @@ class _RootScreenState extends State<RootScreen> {
   @override
   void initState() {
     super.initState();
-    // 첫 프레임이 그려진 뒤에 토큰 확인 후 라우팅합니다.
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndNavigate());
   }
 
@@ -34,8 +35,17 @@ class _RootScreenState extends State<RootScreen> {
     final hasToken = await TokenStorage.hasAccessToken();
     if (!mounted) return;
 
-    final route = hasToken ? AppRoutes.home : AppRoutes.login;
-    // pushReplacementNamed 로 이 화면을 스택에서 제거하고 목적지로 교체합니다.
+    if (!hasToken) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+      return;
+    }
+
+    // 토큰 있으면 /me 호출해 현재 사용자 정보를 메모리에 세팅 후 홈으로
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    final ok = await fetchAndSetCurrentUser(baseUrl);
+    if (!mounted) return;
+
+    final route = ok ? AppRoutes.home : AppRoutes.login;
     Navigator.of(context).pushReplacementNamed(route);
   }
 

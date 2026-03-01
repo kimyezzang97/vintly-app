@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
 import '../../../shared/api/api_client.dart';
+import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
 
 /// 로그인 화면을 감싸는 StatelessWidget.
@@ -150,6 +151,9 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
               refresh: refreshToken,
             );
             await TokenStorage.saveLastLoginEmail(_emailController.text.trim());
+            // /me 호출해 현재 사용자 정보를 메모리에 세팅 (댓글 수정/삭제 버튼 표시용)
+            final baseUrl = AppConfig.instance.backend.baseUrl;
+            await fetchAndSetCurrentUser(baseUrl);
           } catch (e, st) {
             saveOk = false;
             debugPrint('[Login] TokenStorage.saveTokens failed: $e');

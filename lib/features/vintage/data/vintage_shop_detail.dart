@@ -41,6 +41,7 @@ class VintageComment {
     required this.content,
     required this.createdAt,
     this.parentCommentId = 0,
+    this.edited = false,
   });
 
   final int commentId;
@@ -50,6 +51,8 @@ class VintageComment {
   final String createdAt;
   /// 0이면 일반 댓글, 0보다 크면 해당 commentId에 대한 대댓글
   final int parentCommentId;
+  /// true면 수정된 댓글 (UI에서 "수정됨" 표시)
+  final bool edited;
 
   factory VintageComment.fromJson(Map<String, dynamic> json) {
     return VintageComment(
@@ -59,6 +62,7 @@ class VintageComment {
       content: _stringFromJson(json['content']),
       createdAt: _stringFromJson(json['createdAt']),
       parentCommentId: _intFromJson(json['parentCommentId']),
+      edited: _boolFromJson(json['edited']),
     );
   }
 
@@ -69,6 +73,14 @@ class VintageComment {
   }
 
   static String _stringFromJson(dynamic v) => v?.toString() ?? '';
+
+  static bool _boolFromJson(dynamic v) {
+    if (v == null) return false;
+    if (v is bool) return v;
+    if (v is String) return v.toLowerCase() == 'true';
+    if (v is num) return v.toInt() == 1;
+    return false;
+  }
 }
 
 /// 빈티지 샵 상세 (GET /api/v1/vintages/{id} data)

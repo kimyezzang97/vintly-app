@@ -13,6 +13,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
 import '../../../shared/api/authenticated_api.dart';
+import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
 import '../data/vintage_shop.dart';
 import '../data/vintage_shop_detail.dart';
@@ -69,6 +70,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       if (response.statusCode == 401 || code == 401) {
         await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
         if (!mounted) return;
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.login,
@@ -79,6 +81,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       if (response.statusCode == 403) {
         await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
         if (!mounted) return;
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.login,
@@ -125,6 +128,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
   Future<void> _logout() async {
     await TokenStorage.clearAll();
+    CurrentUserHolder.clear();
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil(
       AppRoutes.login,
@@ -182,6 +186,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
     if (result.needReLogin) {
       await TokenStorage.clearAll();
+      CurrentUserHolder.clear();
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(
         AppRoutes.login,
@@ -208,6 +213,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
     VintageShopDetail? updatedDetail;
     VintageComment? replyingTo;
     final commentController = TextEditingController();
+    final commentFocusNode = FocusNode();
+    // 대댓글 포함 댓글이 3개 이상이면 시트를 꽉 채워서 열기
+    final initialSheetSize = detail.comments.length >= 3 ? 0.95 : 0.75;
 
     showModalBottomSheet<void>(
       context: context,
@@ -215,7 +223,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
+        initialChildSize: initialSheetSize,
         minChildSize: 0.4,
         maxChildSize: 0.95,
         expand: false,
@@ -355,7 +363,20 @@ class _VintageListScreenState extends State<VintageListScreen> {
                     detail: updatedDetail ?? detail,
                     replyingTo: replyingTo,
                     commentController: commentController,
-                    onReplyTap: (c) => setStateSB(() => replyingTo = c),
+                    commentFocusNode: commentFocusNode,
+                    onReplyTap: (c) {
+                      setStateSB(() => replyingTo = c);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        commentFocusNode.requestFocus();
+                        if (scrollController.hasClients) {
+                          scrollController.animateTo(
+                            scrollController.position.maxScrollExtent,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      });
+                    },
                     onCancelReply: () => setStateSB(() => replyingTo = null),
                     onCommentSubmitted: () async {
                       final text = commentController.text.trim();
@@ -376,14 +397,49 @@ class _VintageListScreenState extends State<VintageListScreen> {
                         }
                       }
                     },
-                    commentTileBuilder: (c, {required bool isReply}) => _commentTile(
-                      context,
-                      c,
-                      isReply: isReply,
-                      onReply: c.parentCommentId == 0
-                          ? () => setStateSB(() => replyingTo = c)
-                          : null,
-                    ),
+                    commentTileBuilder: (c, {required bool isReply}) {
+                      final d = updatedDetail ?? detail;
+                      return _commentTile(
+                        context,
+                        c,
+                        isReply: isReply,
+                        onReply: c.parentCommentId == 0
+                            ? () => setStateSB(() => replyingTo = c)
+                            : null,
+                        currentMemberId: CurrentUserHolder.memberId,
+                        onEdit: () async {
+                          final newContent = await _showEditCommentDialog(context, c.content);
+                          if (newContent == null || newContent.isEmpty || !context.mounted) return;
+                          final success = await _putComment(
+                            vintageId: d.vintageId,
+                            commentId: c.commentId,
+                            comment: newContent,
+                          );
+                          if (!context.mounted) return;
+                          if (success) {
+                            final result = await _fetchShopDetail(d.vintageId);
+                            if (context.mounted && result.detail != null) {
+                              setStateSB(() => updatedDetail = result.detail);
+                            }
+                          }
+                        },
+                        onDelete: () async {
+                          final confirm = await _showDeleteCommentConfirmDialog(context);
+                          if (confirm != true || !context.mounted) return;
+                          final success = await _deleteComment(
+                            vintageId: d.vintageId,
+                            commentId: c.commentId,
+                          );
+                          if (!context.mounted) return;
+                          if (success) {
+                            final result = await _fetchShopDetail(d.vintageId);
+                            if (context.mounted && result.detail != null) {
+                              setStateSB(() => updatedDetail = result.detail);
+                            }
+                          }
+                        },
+                      );
+                    },
                   ),
                 ],
               ),
@@ -392,9 +448,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
         ),
       ),
     ).then((_) {
-      // TextField가 controller에서 먼저 분리된 뒤 dispose (한 프레임 뒤)
       WidgetsBinding.instance.addPostFrameCallback((_) {
         commentController.dispose();
+        commentFocusNode.dispose();
       });
     });
   }
@@ -416,6 +472,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
         await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
         if (!mounted) return null;
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.login,
@@ -477,10 +534,14 @@ class _VintageListScreenState extends State<VintageListScreen> {
     VintageComment c, {
     bool isReply = false,
     VoidCallback? onReply,
+    int? currentMemberId,
+    Future<void> Function()? onEdit,
+    Future<void> Function()? onDelete,
   }) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final initial = c.nickname.isNotEmpty ? c.nickname[0].toUpperCase() : '?';
+    final isMine = currentMemberId != null && c.memberId == currentMemberId;
     return Padding(
       padding: EdgeInsets.only(
         bottom: 14,
@@ -524,6 +585,16 @@ class _VintageListScreenState extends State<VintageListScreen> {
                         fontSize: isReply ? 11 : null,
                       ),
                     ),
+                    if (c.edited) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '(수정됨)',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontSize: isReply ? 11 : null,
+                        ),
+                      ),
+                    ],
                     if (onReply != null) ...[
                       const SizedBox(width: 8),
                       TextButton(
@@ -541,6 +612,39 @@ class _VintageListScreenState extends State<VintageListScreen> {
                         ),
                       ),
                     ],
+                    if (isMine && (onEdit != null || onDelete != null)) ...[
+                      const SizedBox(width: 4),
+                      if (onEdit != null)
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => onEdit(),
+                          child: Text(
+                            '수정',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.outline,
+                            ),
+                          ),
+                        ),
+                      if (onDelete != null)
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => onDelete(),
+                          child: Text(
+                            '삭제',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.error,
+                            ),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -556,6 +660,69 @@ class _VintageListScreenState extends State<VintageListScreen> {
         ],
       ),
     );
+  }
+
+  Future<String?> _showEditCommentDialog(BuildContext context, String initialContent) async {
+    final controller = TextEditingController(text: initialContent);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('댓글 수정'),
+          content: TextField(
+            controller: controller,
+            maxLines: 3,
+            minLines: 1,
+            decoration: const InputDecoration(
+              hintText: '댓글 내용',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                Navigator.of(ctx).pop(text.isEmpty ? null : text);
+              },
+              child: const Text('수정'),
+            ),
+          ],
+        );
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    return result;
+  }
+
+  Future<bool> _showDeleteCommentConfirmDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('댓글 삭제'),
+          content: const Text('이 댓글을 삭제할까요?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
   }
 
   String _formatDate(String iso) {
@@ -590,6 +757,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
         await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
         if (!mounted) return false;
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.login,
@@ -616,6 +784,110 @@ class _VintageListScreenState extends State<VintageListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('댓글 등록 중 오류: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  /// 댓글 수정 API: PUT /api/v1/vintages/{vintageId}/comments/{commentId}
+  Future<bool> _putComment({
+    required int vintageId,
+    required int commentId,
+    required String comment,
+  }) async {
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    final path = '/api/v1/vintages/$vintageId/comments/$commentId';
+
+    try {
+      final response = await putJsonWithAuth(
+        baseUrl,
+        path,
+        body: {
+          'commentId': commentId,
+          'comment': comment,
+        },
+      );
+
+      final code = response.code ?? response.statusCode;
+
+      if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return false;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return false;
+      }
+
+      final success = response.json['success'] == true;
+      if (!success) {
+        final msg = response.msg ?? '댓글 수정에 실패했습니다.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }
+        return false;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('댓글이 수정되었습니다.')),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('댓글 수정 중 오류: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  /// 댓글 삭제 API: DELETE /api/v1/vintages/{vintageId}/comments/{commentId}
+  Future<bool> _deleteComment({
+    required int vintageId,
+    required int commentId,
+  }) async {
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    final path = '/api/v1/vintages/$vintageId/comments/$commentId';
+
+    try {
+      final response = await deleteWithAuth(baseUrl, path);
+
+      final code = response.code ?? response.statusCode;
+
+      if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return false;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return false;
+      }
+
+      final success = response.json['success'] == true;
+      if (!success) {
+        final msg = response.msg ?? '댓글 삭제에 실패했습니다.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }
+        return false;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('댓글이 삭제되었습니다.')),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('댓글 삭제 중 오류: $e')),
         );
       }
       return false;
@@ -666,6 +938,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
                   onPressed: () async {
                     final navigator = Navigator.of(context);
                     await TokenStorage.clearAll();
+                    CurrentUserHolder.clear();
                     if (!mounted) return;
                     navigator.pushNamedAndRemoveUntil(
                       AppRoutes.login,
@@ -793,6 +1066,7 @@ class _CommentSection extends StatelessWidget {
     required this.detail,
     required this.replyingTo,
     required this.commentController,
+    this.commentFocusNode,
     required this.onReplyTap,
     required this.onCancelReply,
     required this.onCommentSubmitted,
@@ -802,6 +1076,7 @@ class _CommentSection extends StatelessWidget {
   final VintageShopDetail detail;
   final VintageComment? replyingTo;
   final TextEditingController commentController;
+  final FocusNode? commentFocusNode;
   final void Function(VintageComment c) onReplyTap;
   final VoidCallback onCancelReply;
   final VoidCallback onCommentSubmitted;
@@ -812,7 +1087,8 @@ class _CommentSection extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final comments = detail.comments;
-    final topLevel = comments.where((c) => c.parentCommentId == 0).toList();
+    final topLevel = comments.where((c) => c.parentCommentId == 0).toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // 오래된 순(위로)
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -843,7 +1119,8 @@ class _CommentSection extends StatelessWidget {
           )
         else
           ...topLevel.expand((t) {
-            final replies = comments.where((c) => c.parentCommentId == t.commentId).toList();
+            final replies = comments.where((c) => c.parentCommentId == t.commentId).toList()
+              ..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // 오래된 순(위로)
             return [
               commentTileBuilder(t, isReply: false),
               ...replies.map((r) => commentTileBuilder(r, isReply: true)),
@@ -880,6 +1157,7 @@ class _CommentSection extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: commentController,
+                focusNode: commentFocusNode,
                 maxLines: 2,
                 minLines: 1,
                 decoration: InputDecoration(
