@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 네트워크 통신을 위한 인터넷 권한 (debug/release 공통) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="vintly_app"
         android:name="${applicationName}"

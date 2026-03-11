@@ -240,219 +240,227 @@ class _VintageListScreenState extends State<VintageListScreen> {
             ],
           ),
           child: StatefulBuilder(
-            builder: (context, setStateSB) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 고정: 핸들 + 이미지 + 주소
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: cs.outline.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      if (detail.imgList.isNotEmpty) ...[
-                        _VintageDetailImageCarousel(
-                          imgList: detail.imgList,
-                          baseUrl: AppConfig.instance.backend.baseUrl,
-                          imagePlaceholder: _imagePlaceholder(),
-                          shopName: detail.name,
-                          likeCount: likeCount,
-                          liked: liked,
-                          likeLoading: likeLoading,
-                          onToggleLike: () async {
-                            if (likeLoading) return;
-                            setStateSB(() => likeLoading = true);
-                            final result = await _toggleLike(
-                              vintageId: detail.vintageId,
-                              currentLiked: liked,
-                            );
-                            if (!context.mounted) return;
-                            setStateSB(() {
-                              likeLoading = false;
-                              if (result != null) {
-                                liked = result.$1;
-                                likeCount = result.$2;
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                      ] else ...[
-                        _imagePlaceholder(),
-                        const SizedBox(height: 20),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: cs.primary.withValues(alpha: 0.3), width: 1),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  detail.name,
-                                  style: theme.textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                              ),
-                              if (likeLoading)
-                                const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              else
-                                Icon(
-                                  liked ? Icons.favorite : Icons.favorite_border,
-                                  color: liked ? Colors.red.shade600 : cs.outline,
-                                  size: 20,
-                                ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$likeCount',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-                      // 주소
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: cs.secondaryContainer.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            builder: (context, setStateSB) {
+              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+              final isKeyboardVisible = bottomInset > 0.0;
+              return AnimatedPadding(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 고정: 핸들 + 이미지 + 주소 (키보드 올라왔을 때는 숨겨서 댓글/입력창 영역 확보)
+                    if (!isKeyboardVisible)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(Icons.location_on_outlined, size: 20, color: cs.secondary),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                detail.address,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                  height: 1.35,
+                            Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: cs.outline.withValues(alpha: 0.4),
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            if (detail.imgList.isNotEmpty) ...[
+                              _VintageDetailImageCarousel(
+                                imgList: detail.imgList,
+                                baseUrl: AppConfig.instance.backend.baseUrl,
+                                imagePlaceholder: _imagePlaceholder(),
+                                shopName: detail.name,
+                                likeCount: likeCount,
+                                liked: liked,
+                                likeLoading: likeLoading,
+                                onToggleLike: () async {
+                                  if (likeLoading) return;
+                                  setStateSB(() => likeLoading = true);
+                                  final result = await _toggleLike(
+                                    vintageId: detail.vintageId,
+                                    currentLiked: liked,
+                                  );
+                                  if (!context.mounted) return;
+                                  setStateSB(() {
+                                    likeLoading = false;
+                                    if (result != null) {
+                                      liked = result.$1;
+                                      likeCount = result.$2;
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                            ] else ...[
+                              _imagePlaceholder(),
+                              const SizedBox(height: 20),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer.withValues(alpha: 0.4),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: cs.primary.withValues(alpha: 0.3), width: 1),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        detail.name,
+                                        style: theme.textTheme.headlineSmall?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                    if (likeLoading)
+                                      const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    else
+                                      Icon(
+                                        liked ? Icons.favorite : Icons.favorite_border,
+                                        color: liked ? Colors.red.shade600 : cs.outline,
+                                        size: 20,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '$likeCount',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+                            // 주소
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: cs.secondaryContainer.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on_outlined, size: 20, color: cs.secondary),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      detail.address,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-                // 스크롤: 댓글만
-                Expanded(
+                    // 스크롤: 댓글만
+                    Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                     child: _CommentSection(
-                    detail: updatedDetail ?? detail,
-                    replyingTo: replyingTo,
-                    commentController: commentController,
-                    commentFocusNode: commentFocusNode,
-                    onReplyTap: (c) {
-                      setStateSB(() => replyingTo = c);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        commentFocusNode.requestFocus();
-                        if (scrollController.hasClients) {
-                          scrollController.animateTo(
-                            scrollController.position.maxScrollExtent,
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOut,
-                          );
-                        }
-                      });
-                    },
-                    onCancelReply: () => setStateSB(() => replyingTo = null),
-                    onCommentSubmitted: () async {
-                      final text = commentController.text.trim();
-                      if (text.isEmpty) return;
-                      final d = updatedDetail ?? detail;
-                      final success = await _postComment(
-                        vintageId: d.vintageId,
-                        parentCommentId: replyingTo?.commentId ?? 0,
-                        comment: text,
-                      );
-                      if (!context.mounted) return;
-                      if (success) {
-                        commentController.clear();
-                        setStateSB(() => replyingTo = null);
-                        final result = await _fetchShopDetail(d.vintageId);
-                        if (context.mounted && result.detail != null) {
-                          setStateSB(() => updatedDetail = result.detail);
-                        }
-                      }
-                    },
-                    commentTileBuilder: (c, {required bool isReply}) {
-                      final d = updatedDetail ?? detail;
-                      return _commentTile(
-                        context,
-                        c,
-                        isReply: isReply,
-                        onReply: c.parentCommentId == 0
-                            ? () => setStateSB(() => replyingTo = c)
-                            : null,
-                        currentMemberId: CurrentUserHolder.memberId,
-                        onEdit: () async {
-                          final newContent = await _showEditCommentDialog(context, c.content);
-                          if (newContent == null || newContent.isEmpty || !context.mounted) return;
-                          final success = await _putComment(
-                            vintageId: d.vintageId,
-                            commentId: c.commentId,
-                            comment: newContent,
-                          );
-                          if (!context.mounted) return;
-                          if (success) {
-                            final result = await _fetchShopDetail(d.vintageId);
-                            if (context.mounted && result.detail != null) {
-                              setStateSB(() => updatedDetail = result.detail);
-                            }
+                      detail: updatedDetail ?? detail,
+                      replyingTo: replyingTo,
+                      commentController: commentController,
+                      commentFocusNode: commentFocusNode,
+                      onReplyTap: (c) {
+                        setStateSB(() => replyingTo = c);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          commentFocusNode.requestFocus();
+                        });
+                      },
+                      onCancelReply: () => setStateSB(() => replyingTo = null),
+                      onCommentSubmitted: () async {
+                        final text = commentController.text.trim();
+                        if (text.isEmpty) return;
+                        final d = updatedDetail ?? detail;
+                        final success = await _postComment(
+                          vintageId: d.vintageId,
+                          parentCommentId: replyingTo?.commentId ?? 0,
+                          comment: text,
+                        );
+                        if (!context.mounted) return;
+                        if (success) {
+                          commentController.clear();
+                          setStateSB(() => replyingTo = null);
+                          final result = await _fetchShopDetail(d.vintageId);
+                          if (context.mounted && result.detail != null) {
+                            setStateSB(() => updatedDetail = result.detail);
                           }
-                        },
-                        onDelete: () async {
-                          final confirm = await _showDeleteCommentConfirmDialog(context);
-                          if (confirm != true || !context.mounted) return;
-                          final success = await _deleteComment(
-                            vintageId: d.vintageId,
-                            commentId: c.commentId,
-                          );
-                          if (!context.mounted) return;
-                          if (success) {
-                            final result = await _fetchShopDetail(d.vintageId);
-                            if (context.mounted && result.detail != null) {
-                              setStateSB(() => updatedDetail = result.detail);
+                        }
+                      },
+                      commentTileBuilder: (c, {required bool isReply}) {
+                        final d = updatedDetail ?? detail;
+                        return _commentTile(
+                          context,
+                          c,
+                          isReply: isReply,
+                          onReply: c.parentCommentId == 0
+                              ? () {
+                                  setStateSB(() => replyingTo = c);
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    commentFocusNode.requestFocus();
+                                  });
+                                }
+                              : null,
+                          currentMemberId: CurrentUserHolder.memberId,
+                          onEdit: () async {
+                            final newContent = await _showEditCommentDialog(context, c.content);
+                            if (newContent == null || newContent.isEmpty || !context.mounted) return;
+                            final success = await _putComment(
+                              vintageId: d.vintageId,
+                              commentId: c.commentId,
+                              comment: newContent,
+                            );
+                            if (!context.mounted) return;
+                            if (success) {
+                              final result = await _fetchShopDetail(d.vintageId);
+                              if (context.mounted && result.detail != null) {
+                                setStateSB(() => updatedDetail = result.detail);
+                              }
                             }
-                          }
-                        },
-                      );
-                    },
+                          },
+                          onDelete: () async {
+                            final confirm = await _showDeleteCommentConfirmDialog(context);
+                            if (confirm != true || !context.mounted) return;
+                            final success = await _deleteComment(
+                              vintageId: d.vintageId,
+                              commentId: c.commentId,
+                            );
+                            if (!context.mounted) return;
+                            if (success) {
+                              final result = await _fetchShopDetail(d.vintageId);
+                              if (context.mounted && result.detail != null) {
+                                setStateSB(() => updatedDetail = result.detail);
+                              }
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ),
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -606,17 +614,27 @@ class _VintageListScreenState extends State<VintageListScreen> {
                     ],
                     if (onReply != null) ...[
                       const SizedBox(width: 8),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: onReply,
-                        child: Text(
-                          '답글',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.primary,
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onReply,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.reply_outlined,
+                                size: 16,
+                                color: cs.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '답글',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -624,17 +642,16 @@ class _VintageListScreenState extends State<VintageListScreen> {
                     if (isMine && (onEdit != null || onDelete != null)) ...[
                       const SizedBox(width: 4),
                       if (onEdit != null)
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          onPressed: () => onEdit(),
-                          child: Text(
-                            '수정',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: cs.outline,
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => onEdit(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                            child: Text(
+                              '수정',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.outline,
+                              ),
                             ),
                           ),
                         ),
@@ -1006,6 +1023,16 @@ class _VintageListScreenState extends State<VintageListScreen> {
                     padding: const EdgeInsets.all(48),
                   ),
                 );
+                // 초기 진입 시 회색 화면 방지를 위해, 눈에 띄지 않을 정도로 카메라를 한 번 살짝 움직여 준다.
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  final camera = _mapController.camera;
+                  // 위도로 아주 조금만 이동 (사용자는 거의 못 느끼는 수준)
+                  final nudgedCenter = LatLng(
+                    camera.center.latitude + 0.0005,
+                    camera.center.longitude,
+                  );
+                  _mapController.move(nudgedCenter, camera.zoom);
+                });
               },
             ),
             children: [
@@ -1130,61 +1157,87 @@ class _CommentSection extends StatelessWidget {
           ...topLevel.expand((t) {
             final replies = comments.where((c) => c.parentCommentId == t.commentId).toList()
               ..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // 오래된 순(위로)
-            return [
+
+            final children = <Widget>[
               commentTileBuilder(t, isReply: false),
-              ...replies.map((r) => commentTileBuilder(r, isReply: true)),
             ];
+
+            // YouTube 스타일: 선택된 댓글 바로 아래에 답글 입력창 표시
+            if (replyingTo != null && replyingTo!.commentId == t.commentId) {
+              children.add(const SizedBox(height: 8));
+              children.add(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: commentController,
+                        focusNode: commentFocusNode,
+                        maxLines: 2,
+                        minLines: 1,
+                        decoration: const InputDecoration(
+                          hintText: '답글을 입력하세요',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        onSubmitted: (_) => onCommentSubmitted(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: onCommentSubmitted,
+                      child: const Text('답글'),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        minimumSize: Size.zero,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: onCancelReply,
+                      child: Text(
+                        '취소',
+                        style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              children.add(const SizedBox(height: 8));
+            }
+
+            children.addAll(replies.map((r) => commentTileBuilder(r, isReply: true)));
+            return children;
           }),
         const SizedBox(height: 16),
-        if (replyingTo != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Text(
-                  '답글: @${replyingTo!.nickname}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.primary,
+        if (replyingTo == null)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: commentController,
+                  focusNode: commentFocusNode,
+                  maxLines: 2,
+                  minLines: 1,
+                  decoration: const InputDecoration(
+                    hintText: '댓글을 입력하세요',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
+                  onSubmitted: (_) => onCommentSubmitted(),
                 ),
-                const SizedBox(width: 8),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    minimumSize: Size.zero,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: onCancelReply,
-                  child: Text('취소', style: theme.textTheme.labelMedium?.copyWith(color: cs.outline)),
-                ),
-              ],
-            ),
-          ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: commentController,
-                focusNode: commentFocusNode,
-                maxLines: 2,
-                minLines: 1,
-                decoration: InputDecoration(
-                  hintText: replyingTo != null ? '답글을 입력하세요' : '댓글을 입력하세요',
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onSubmitted: (_) => onCommentSubmitted(),
               ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: onCommentSubmitted,
-              child: const Text('등록'),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: onCommentSubmitted,
+                child: const Text('등록'),
+              ),
+            ],
+          ),
       ],
     );
   }
