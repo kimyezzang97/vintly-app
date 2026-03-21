@@ -32,28 +32,40 @@ class _MainShellState extends State<MainShell> {
         ],
       ),
       bottomNavigationBar: Container(
-        height: 70,
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-        ),
+        color: cs.surfaceContainerHighest,
         child: SafeArea(
           top: false,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(_tabs.length, (i) {
-              final t = _tabs[i];
-              final isSelected = _currentIndex == i;
-              return Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _currentIndex = i),
-                  child: Icon(
-                    t.icon,
-                    color: isSelected ? cs.primary : cs.onSurfaceVariant,
-                    size: 26,
+          child: SizedBox(
+            height: 60,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: List.generate(_tabs.length, (i) {
+                final t = _tabs[i];
+                final isSelected = _currentIndex == i;
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _currentIndex = i),
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? cs.primaryContainer
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          t.icon,
+                          color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                          size: 24,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ),
