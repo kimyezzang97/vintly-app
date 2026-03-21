@@ -59,7 +59,7 @@ class _RootScreenState extends State<RootScreen> {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Vintly'),
+            Text('VINTLY'),
           ],
         ),
       ),

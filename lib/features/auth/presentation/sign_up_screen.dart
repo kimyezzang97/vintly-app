@@ -284,14 +284,6 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
                       child: const Text('이미 계정이 있어요. 로그인'),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      '※ 현재는 UI/검증만 구현되어 있으며, 실제 회원가입 저장은 추후 백엔드 연동 시 추가됩니다.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
-                    ),
                   ],
                 ),
               ),

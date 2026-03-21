@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'app_routes.dart';
+import 'main_shell.dart';
 import 'root_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/sign_up_screen.dart';
-import '../features/vintage/presentation/vintage_list_screen.dart';
 
 class VintlyApp extends StatelessWidget {
   const VintlyApp({super.key});
@@ -31,7 +31,7 @@ class VintlyApp extends StatelessWidget {
         AppRoutes.root: (_) => const RootScreen(),
         AppRoutes.login: (_) => const LoginScreen(),
         AppRoutes.signUp: (_) => const SignUpScreen(),
-        AppRoutes.home: (_) => const VintageListScreen(),
+        AppRoutes.home: (_) => const MainShell(),
       },
     );
   }

@@ -126,16 +126,6 @@ class _VintageListScreenState extends State<VintageListScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await TokenStorage.clearAll();
-    CurrentUserHolder.clear();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
-  }
-
   /// 상세 API 호출: GET /api/v1/vintages/{id} (401 시 reissue 후 재시도).
   /// 401/403이면 needReLogin true로 반환 → 로그인 화면으로 이동.
   Future<({VintageShopDetail? detail, bool needReLogin})> _fetchShopDetail(int vintageId) async {
@@ -925,12 +915,6 @@ class _VintageListScreenState extends State<VintageListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vintage Shops'),
-        actions: [
-          TextButton(
-            onPressed: _loading ? null : _logout,
-            child: const Text('로그아웃'),
-          ),
-        ],
       ),
       body: _buildBody(),
     );
