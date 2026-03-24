@@ -149,52 +149,73 @@ class _VintageListScreenState extends State<VintageListScreen> {
   }
 
   /// 마커 탭: 상세 API 호출 후 바텀시트로 상세 정보 표시 (lat/lon 제외)
+  /// 로딩은 오버레이로만 표시해, 로딩 시트 닫힘 → 상세 시트 열림 이중 애니메이션을 피함.
   void _onMarkerTap(VintageShop shop) async {
     if (!mounted) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (_) => Positioned.fill(
+        child: Material(
+          color: Colors.transparent,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('상세 정보를 불러오는 중...'),
+              const ModalBarrier(
+                color: Colors.transparent,
+                dismissible: false,
+              ),
+              const Center(
+                child: CircularProgressIndicator(),
+              ),
             ],
           ),
         ),
       ),
     );
-
-    final result = await _fetchShopDetail(shop.vintageId);
-    if (!mounted) return;
-    Navigator.of(context).pop(); // 로딩 시트 닫기
-
-    if (result.needReLogin) {
-      await TokenStorage.clearAll();
-      CurrentUserHolder.clear();
+    overlay.insert(entry);
+    var loadingRemoved = false;
+    try {
+      final result = await _fetchShopDetail(shop.vintageId);
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.login,
-        (route) => false,
-      );
-      return;
-    }
-    if (result.detail == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('상세 정보를 불러오지 못했습니다.')),
-      );
-      return;
-    }
 
-    _showDetailBottomSheet(result.detail!);
+      if (result.needReLogin) {
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return;
+      }
+      if (result.detail == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('상세 정보를 불러오지 못했습니다.')),
+        );
+        return;
+      }
+
+      final access = await TokenStorage.getAccessToken();
+      final imageHeaders = (access != null && access.isNotEmpty)
+          ? <String, String>{'access': access}
+          : null;
+      if (!mounted) return;
+      entry.remove();
+      entry.dispose();
+      loadingRemoved = true;
+      _showDetailBottomSheet(result.detail!, imageRequestHeaders: imageHeaders);
+    } finally {
+      if (!loadingRemoved) {
+        entry.remove();
+        entry.dispose();
+      }
+    }
   }
 
-  void _showDetailBottomSheet(VintageShopDetail detail) {
+  void _showDetailBottomSheet(
+    VintageShopDetail detail, {
+    Map<String, String>? imageRequestHeaders,
+  }) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     bool liked = detail.liked;
@@ -262,6 +283,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
                               _VintageDetailImageCarousel(
                                 imgList: detail.imgList,
                                 baseUrl: AppConfig.instance.backend.baseUrl,
+                                imageRequestHeaders: imageRequestHeaders,
                                 imagePlaceholder: _imagePlaceholder(),
                                 shopName: detail.name,
                                 likeCount: likeCount,
@@ -1271,6 +1293,7 @@ class _VintageDetailImageCarousel extends StatefulWidget {
     required this.imgList,
     required this.baseUrl,
     required this.imagePlaceholder,
+    this.imageRequestHeaders,
     this.shopName,
     this.likeCount = 0,
     this.liked = false,
@@ -1280,6 +1303,8 @@ class _VintageDetailImageCarousel extends StatefulWidget {
 
   final List<VintageImage> imgList;
   final String baseUrl;
+  /// API 이미지가 access 헤더를 요구할 때 전달 (Image.network 에 그대로 사용)
+  final Map<String, String>? imageRequestHeaders;
   final Widget imagePlaceholder;
   final String? shopName;
   final int likeCount;
@@ -1319,9 +1344,25 @@ class _VintageDetailImageCarouselState extends State<_VintageDetailImageCarousel
   }
 
   String _imageUrl(VintageImage img) {
-    if (img.imgPath.startsWith('http')) return img.imgPath;
+    final raw = img.imgPath.trim();
+    if (raw.isEmpty) return '';
+    final lower = raw.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) return raw;
     final base = widget.baseUrl.replaceAll(RegExp(r'/$'), '');
-    return img.imgPath.startsWith('/') ? '$base${img.imgPath}' : '$base/${img.imgPath}';
+    return raw.startsWith('/') ? '$base$raw' : '$base/$raw';
+  }
+
+  /// S3 등 외부 도메인에는 커스텀 헤더를 붙이면 403·디코딩 실패가 날 수 있음 → API와 같은 호스트일 때만 access 전달
+  Map<String, String>? _headersForResolvedUrl(String url) {
+    final extra = widget.imageRequestHeaders;
+    if (extra == null || extra.isEmpty) return null;
+    final imageUri = Uri.tryParse(url);
+    final baseUri = Uri.tryParse(widget.baseUrl);
+    if (imageUri == null || baseUri == null || !imageUri.hasScheme) return null;
+    if (imageUri.host.isEmpty) return null;
+    if (imageUri.host != baseUri.host) return null;
+    if (imageUri.port != baseUri.port) return null;
+    return extra;
   }
 
   @override
@@ -1344,15 +1385,19 @@ class _VintageDetailImageCarouselState extends State<_VintageDetailImageCarousel
                 itemCount: list.length,
                 itemBuilder: (context, index) {
                   final img = list[index];
+                  final url = _imageUrl(img);
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        _imageUrl(img),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => widget.imagePlaceholder,
-                      ),
+                      child: url.isEmpty
+                          ? widget.imagePlaceholder
+                          : Image.network(
+                              url,
+                              fit: BoxFit.cover,
+                              headers: _headersForResolvedUrl(url),
+                              errorBuilder: (_, __, ___) => widget.imagePlaceholder,
+                            ),
                     ),
                   );
                 },
