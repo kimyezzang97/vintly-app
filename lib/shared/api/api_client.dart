@@ -81,24 +81,40 @@ class ApiClient {
   }
 
   /// DELETE 요청을 보내고 JSON 응답을 반환합니다.
+  /// [body]가 있으면 `Content-Type: application/json`으로 직렬화해 보냅니다.
   Future<ApiResponse> deleteJson(
     String path, {
     Map<String, String>? headers,
+    Map<String, dynamic>? body,
+    Set<String> redactKeys = const {'password'},
   }) async {
     final uri = _uri(path);
     const method = 'DELETE';
+
+    final Map<String, dynamic>? sanitizedBody = body == null
+        ? null
+        : {
+            for (final entry in body.entries)
+              entry.key: redactKeys.contains(entry.key) ? '***' : entry.value,
+          };
 
     ApiLogger.logRequest(
       method: method,
       uri: uri,
       headers: headers,
-      body: null,
+      body: sanitizedBody,
     );
 
     final httpClient = HttpClient();
     try {
-      final request = await httpClient.deleteUrl(uri);
+      final request = await httpClient.openUrl(method, uri);
+      if (body != null) {
+        request.headers.contentType = ContentType.json;
+      }
       headers?.forEach(request.headers.add);
+      if (body != null) {
+        request.write(jsonEncode(body));
+      }
 
       final response = await request.close();
       final rawBody = await response.transform(utf8.decoder).join();
@@ -166,6 +182,76 @@ class ApiClient {
     final httpClient = HttpClient();
     try {
       final request = await httpClient.putUrl(uri);
+      request.headers.contentType = ContentType.json;
+      headers?.forEach(request.headers.add);
+      request.write(jsonEncode(body));
+
+      final response = await request.close();
+      final rawBody = await response.transform(utf8.decoder).join();
+
+      final headersMap = <String, List<String>>{};
+      response.headers.forEach(
+        (name, values) => headersMap[name.toLowerCase()] = List<String>.from(
+          values,
+          growable: false,
+        ),
+      );
+
+      Map<String, dynamic> json = <String, dynamic>{};
+      if (rawBody.isNotEmpty) {
+        final dynamic decoded = jsonDecode(rawBody);
+        if (decoded is Map<String, dynamic>) {
+          json = decoded;
+        }
+      }
+
+      ApiLogger.logResponse(
+        method: method,
+        uri: uri,
+        statusCode: response.statusCode,
+        headers: headersMap,
+        body: rawBody,
+      );
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        rawBody: rawBody,
+        json: json,
+        headers: headersMap,
+      );
+    } catch (e, st) {
+      ApiLogger.logError(method: method, uri: uri, error: e, stackTrace: st);
+      rethrow;
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  /// PATCH 요청을 보내고 JSON 응답을 반환합니다.
+  Future<ApiResponse> patchJson(
+    String path, {
+    Map<String, String>? headers,
+    required Map<String, dynamic> body,
+    Set<String> redactKeys = const {'password', 'currentPassword', 'newPassword'},
+  }) async {
+    final uri = _uri(path);
+    const method = 'PATCH';
+
+    final sanitizedBody = <String, dynamic>{
+      for (final entry in body.entries)
+        entry.key: redactKeys.contains(entry.key) ? '***' : entry.value,
+    };
+
+    ApiLogger.logRequest(
+      method: method,
+      uri: uri,
+      headers: headers,
+      body: sanitizedBody,
+    );
+
+    final httpClient = HttpClient();
+    try {
+      final request = await httpClient.patchUrl(uri);
       request.headers.contentType = ContentType.json;
       headers?.forEach(request.headers.add);
       request.write(jsonEncode(body));

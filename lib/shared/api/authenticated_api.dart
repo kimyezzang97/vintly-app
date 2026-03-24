@@ -38,7 +38,12 @@ Future<ApiResponse> getJsonWithAuth(String baseUrl, String path) async {
 
 /// access 토큰을 헤더에 넣어 DELETE 요청을 보냅니다.
 /// 응답이 401이면 reissue를 시도하고, 성공 시 같은 요청을 새 토큰으로 한 번만 재시도합니다.
-Future<ApiResponse> deleteWithAuth(String baseUrl, String path) async {
+Future<ApiResponse> deleteWithAuth(
+  String baseUrl,
+  String path, {
+  Map<String, dynamic>? body,
+  Set<String> redactKeys = const {'password'},
+}) async {
   final token = await TokenStorage.getAccessToken();
   final api = ApiClient(baseUrl: baseUrl);
   final headers = token != null && token.isNotEmpty ? {'access': token} : null;
@@ -46,6 +51,8 @@ Future<ApiResponse> deleteWithAuth(String baseUrl, String path) async {
   ApiResponse response = await api.deleteJson(
     path,
     headers: headers,
+    body: body,
+    redactKeys: redactKeys,
   );
 
   if (response.statusCode == 401) {
@@ -56,6 +63,8 @@ Future<ApiResponse> deleteWithAuth(String baseUrl, String path) async {
         response = await api.deleteJson(
           path,
           headers: {'access': newToken},
+          body: body,
+          redactKeys: redactKeys,
         );
       }
     }
@@ -89,6 +98,43 @@ Future<ApiResponse> putJsonWithAuth(
       final newToken = await TokenStorage.getAccessToken();
       if (newToken != null && newToken.isNotEmpty) {
         response = await api.putJson(
+          path,
+          headers: {'access': newToken},
+          body: body,
+          redactKeys: redactKeys,
+        );
+      }
+    }
+  }
+
+  return response;
+}
+
+/// access 토큰을 헤더에 넣어 PATCH 요청을 보냅니다.
+/// 응답이 401이면 reissue를 시도하고, 성공 시 같은 요청을 새 토큰으로 한 번만 재시도합니다.
+Future<ApiResponse> patchJsonWithAuth(
+  String baseUrl,
+  String path, {
+  required Map<String, dynamic> body,
+  Set<String> redactKeys = const {'password', 'currentPassword', 'newPassword'},
+}) async {
+  final token = await TokenStorage.getAccessToken();
+  final api = ApiClient(baseUrl: baseUrl);
+  final headers = token != null && token.isNotEmpty ? {'access': token} : null;
+
+  ApiResponse response = await api.patchJson(
+    path,
+    headers: headers,
+    body: body,
+    redactKeys: redactKeys,
+  );
+
+  if (response.statusCode == 401) {
+    final reissued = await reissueTokens(baseUrl);
+    if (reissued) {
+      final newToken = await TokenStorage.getAccessToken();
+      if (newToken != null && newToken.isNotEmpty) {
+        response = await api.patchJson(
           path,
           headers: {'access': newToken},
           body: body,
