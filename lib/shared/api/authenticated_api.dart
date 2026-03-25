@@ -183,3 +183,42 @@ Future<ApiResponse> postJsonWithAuth(
 
   return response;
 }
+
+/// multipart POST (예: 게시판 글 + 이미지). 401이면 reissue 후 한 번 재시도.
+Future<ApiResponse> postMultipartWithAuth(
+  String baseUrl,
+  String path, {
+  required Map<String, String> fields,
+  String fileFieldName = 'images',
+  required List<({String filename, List<int> bytes, String contentType})> files,
+}) async {
+  final token = await TokenStorage.getAccessToken();
+  final api = ApiClient(baseUrl: baseUrl);
+  final headers = token != null && token.isNotEmpty ? {'access': token} : null;
+
+  ApiResponse response = await api.postMultipart(
+    path,
+    headers: headers,
+    fields: fields,
+    fileFieldName: fileFieldName,
+    files: files,
+  );
+
+  if (response.statusCode == 401) {
+    final reissued = await reissueTokens(baseUrl);
+    if (reissued) {
+      final newToken = await TokenStorage.getAccessToken();
+      if (newToken != null && newToken.isNotEmpty) {
+        response = await api.postMultipart(
+          path,
+          headers: {'access': newToken},
+          fields: fields,
+          fileFieldName: fileFieldName,
+          files: files,
+        );
+      }
+    }
+  }
+
+  return response;
+}

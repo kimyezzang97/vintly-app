@@ -43,6 +43,9 @@ dependencies:
   flutter_map: ^8.2.2
   latlong2: ^0.9.1
 
+  # 게시판 이미지 첨부(갤러리)
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

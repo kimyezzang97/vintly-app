@@ -4,6 +4,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'board_create_screen.dart';
+
 class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
 
@@ -144,6 +146,18 @@ class _BoardScreenState extends State<BoardScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Board'),
+        actions: [
+          IconButton(
+            tooltip: '글 작성',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () async {
+              final created = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(builder: (_) => const BoardCreateScreen()),
+              );
+              if (created == true && mounted) _loadPage(0);
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(

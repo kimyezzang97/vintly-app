@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'api_logger.dart';
 import 'api_response.dart';
@@ -273,6 +274,107 @@ class ApiClient {
         if (decoded is Map<String, dynamic>) {
           json = decoded;
         }
+      }
+
+      ApiLogger.logResponse(
+        method: method,
+        uri: uri,
+        statusCode: response.statusCode,
+        headers: headersMap,
+        body: rawBody,
+      );
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        rawBody: rawBody,
+        json: json,
+        headers: headersMap,
+      );
+    } catch (e, st) {
+      ApiLogger.logError(method: method, uri: uri, error: e, stackTrace: st);
+      rethrow;
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  /// POST `multipart/form-data` (텍스트 필드 + 파일). 파일은 동일 [fileFieldName]로 여러 파트 가능.
+  Future<ApiResponse> postMultipart(
+    String path, {
+    Map<String, String>? headers,
+    required Map<String, String> fields,
+    String fileFieldName = 'images',
+    required List<({String filename, List<int> bytes, String contentType})> files,
+  }) async {
+    final uri = _uri(path);
+    const method = 'POST';
+    final boundary = 'dart-${DateTime.now().microsecondsSinceEpoch}';
+
+    ApiLogger.logRequest(
+      method: method,
+      uri: uri,
+      headers: headers,
+      body: {
+        'multipart': true,
+        'fields': fields,
+        'files': [for (final f in files) f.filename],
+      },
+    );
+
+    final httpClient = HttpClient();
+    try {
+      final request = await httpClient.postUrl(uri);
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'multipart/form-data; boundary=$boundary',
+      );
+      headers?.forEach((k, v) {
+        final key = k.toLowerCase();
+        if (key == 'content-type') return;
+        request.headers.add(k, v);
+      });
+
+      final builder = BytesBuilder(copy: false);
+      void addUtf8(String s) => builder.add(utf8.encode(s));
+
+      for (final e in fields.entries) {
+        addUtf8('--$boundary\r\n');
+        addUtf8('Content-Disposition: form-data; name="${e.key}"\r\n\r\n');
+        addUtf8(e.value);
+        addUtf8('\r\n');
+      }
+      for (final f in files) {
+        addUtf8('--$boundary\r\n');
+        addUtf8(
+          'Content-Disposition: form-data; name="$fileFieldName"; filename="${f.filename}"\r\n',
+        );
+        addUtf8('Content-Type: ${f.contentType}\r\n\r\n');
+        builder.add(f.bytes);
+        addUtf8('\r\n');
+      }
+      addUtf8('--$boundary--\r\n');
+
+      request.add(builder.takeBytes());
+
+      final response = await request.close();
+      final rawBody = await response.transform(utf8.decoder).join();
+
+      final headersMap = <String, List<String>>{};
+      response.headers.forEach(
+        (name, values) => headersMap[name.toLowerCase()] = List<String>.from(
+          values,
+          growable: false,
+        ),
+      );
+
+      Map<String, dynamic> json = <String, dynamic>{};
+      if (rawBody.isNotEmpty) {
+        try {
+          final dynamic decoded = jsonDecode(rawBody);
+          if (decoded is Map<String, dynamic>) {
+            json = decoded;
+          }
+        } catch (_) {}
       }
 
       ApiLogger.logResponse(
