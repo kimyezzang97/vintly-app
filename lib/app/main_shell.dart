@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../features/board/presentation/board_screen.dart';
 import '../features/mypage/presentation/mypage_screen.dart';
 import '../features/vintage/presentation/vintage_list_screen.dart';
 
-/// 하단 메뉴바가 있는 메인 쉘. Shop / (게시판 자리, 미연동) / MyPage.
+/// 하단 메뉴바가 있는 메인 쉘. Shop / Board / MyPage.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -22,6 +23,7 @@ class _MainShellState extends State<MainShell> {
         index: _currentIndex,
         children: const [
           VintageListScreen(),
+          BoardScreen(),
           MyPageScreen(),
         ],
       ),
@@ -42,20 +44,19 @@ class _MainShellState extends State<MainShell> {
                   ),
                 ),
                 Expanded(
-                  child: Center(
-                    child: Icon(
-                      Icons.article_outlined,
-                      color: cs.onSurfaceVariant,
-                      size: 26,
-                    ),
+                  child: _NavTab(
+                    icon: Icons.article_outlined,
+                    selected: _currentIndex == 1,
+                    colorScheme: cs,
+                    onTap: () => setState(() => _currentIndex = 1),
                   ),
                 ),
                 Expanded(
                   child: _NavTab(
                     icon: Icons.person,
-                    selected: _currentIndex == 1,
+                    selected: _currentIndex == 2,
                     colorScheme: cs,
-                    onTap: () => setState(() => _currentIndex = 1),
+                    onTap: () => setState(() => _currentIndex = 2),
                   ),
                 ),
               ],

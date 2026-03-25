@@ -84,6 +84,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
     final email = CurrentUserHolder.email ?? '-';
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('My'),
         bottom: PreferredSize(

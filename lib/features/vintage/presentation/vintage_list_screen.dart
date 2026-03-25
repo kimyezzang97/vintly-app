@@ -934,9 +934,20 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Vintage Shops'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: cs.outline.withValues(alpha: 0.2),
+          ),
+        ),
       ),
       body: _buildBody(),
     );
