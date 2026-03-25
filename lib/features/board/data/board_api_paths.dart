@@ -2,6 +2,9 @@
 class BoardApiPaths {
   BoardApiPaths._();
 
+  /// GET: keyword, page, size — POST multipart: title, content, images (max 10)
+  static const String boards = '/api/v1/boards';
+
   /// POST multipart: title, content, images (max 10)
-  static const String createBoard = '/api/v1/boards';
+  static const String createBoard = boards;
 }

@@ -16,19 +16,31 @@ import '../auth/token_storage.dart';
 /// access 토큰을 헤더에 넣어 GET 요청을 보냅니다.
 /// 응답이 401이면 reissue를 시도하고, 성공 시 같은 요청을 새 토큰으로 한 번만 재시도합니다.
 /// 재시도 후에도 401이거나 reissue가 실패하면 그대로 401 응답을 반환합니다.
-Future<ApiResponse> getJsonWithAuth(String baseUrl, String path) async {
+Future<ApiResponse> getJsonWithAuth(
+  String baseUrl,
+  String path, {
+  Map<String, String>? queryParameters,
+}) async {
   final token = await TokenStorage.getAccessToken();
   final api = ApiClient(baseUrl: baseUrl);
   final headers = token != null && token.isNotEmpty ? {'access': token} : null;
 
-  ApiResponse response = await api.getJson(path, headers: headers);
+  ApiResponse response = await api.getJson(
+    path,
+    headers: headers,
+    queryParameters: queryParameters,
+  );
 
   if (response.statusCode == 401) {
     final reissued = await reissueTokens(baseUrl);
     if (reissued) {
       final newToken = await TokenStorage.getAccessToken();
       if (newToken != null && newToken.isNotEmpty) {
-        response = await api.getJson(path, headers: {'access': newToken});
+        response = await api.getJson(
+          path,
+          headers: {'access': newToken},
+          queryParameters: queryParameters,
+        );
       }
     }
   }

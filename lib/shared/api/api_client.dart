@@ -10,7 +10,15 @@ class ApiClient {
 
   final String baseUrl;
 
-  Uri _uri(String path) => Uri.parse('$baseUrl$path');
+  Uri _uri(String path, [Map<String, String>? queryParameters]) {
+    final uri = Uri.parse('$baseUrl$path');
+    if (queryParameters == null || queryParameters.isEmpty) return uri;
+    final merged = Map<String, String>.from(uri.queryParameters);
+    for (final e in queryParameters.entries) {
+      merged[e.key] = e.value;
+    }
+    return uri.replace(queryParameters: merged);
+  }
 
   Future<ApiResponse> postJson(
     String path, {
@@ -405,8 +413,9 @@ class ApiClient {
   Future<ApiResponse> getJson(
     String path, {
     Map<String, String>? headers,
+    Map<String, String>? queryParameters,
   }) async {
-    final uri = _uri(path);
+    final uri = _uri(path, queryParameters);
     const method = 'GET';
 
     ApiLogger.logRequest(
