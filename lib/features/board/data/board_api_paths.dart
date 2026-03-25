@@ -7,4 +7,7 @@ class BoardApiPaths {
 
   /// POST multipart: title, content, images (max 10)
   static const String createBoard = boards;
+
+  /// GET 상세
+  static String boardDetail(int boardId) => '/api/v1/boards/$boardId';
 }

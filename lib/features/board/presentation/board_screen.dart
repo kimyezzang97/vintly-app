@@ -12,6 +12,7 @@ import '../../../shared/auth/token_storage.dart';
 import '../data/board_api_paths.dart';
 import '../data/board_list_response.dart';
 import 'board_create_screen.dart';
+import 'board_detail_screen.dart';
 
 class BoardScreen extends StatefulWidget {
   const BoardScreen({super.key});
@@ -168,6 +169,14 @@ class _BoardScreenState extends State<BoardScreen> {
 
   Future<void> _onRefresh() => _loadPage(_currentPage);
 
+  void _openBoardDetail(int boardId) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => BoardDetailScreen(boardId: boardId),
+      ),
+    );
+  }
+
   int get _listItemCount {
     if (_loading && _items.isEmpty) return 0;
     if (_items.isEmpty && !_loading) return 1;
@@ -266,6 +275,7 @@ class _BoardScreenState extends State<BoardScreen> {
                             _BoardListTile(
                               rowNumber: rowNumber,
                               item: item,
+                              onTap: () => _openBoardDetail(item.id),
                             ),
                             Divider(
                               height: 1,
@@ -544,10 +554,12 @@ class _BoardListTile extends StatelessWidget {
   const _BoardListTile({
     required this.rowNumber,
     required this.item,
+    required this.onTap,
   });
 
   final int rowNumber;
   final _BoardListItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -556,7 +568,7 @@ class _BoardListTile extends StatelessWidget {
     final bodySmall = theme.textTheme.bodySmall;
 
     return InkWell(
-      onTap: () {}, // 상세는 추후
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
