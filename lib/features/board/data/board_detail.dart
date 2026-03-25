@@ -28,6 +28,25 @@ class BoardDetail {
   final String createdAt;
   final String updatedAt;
 
+  BoardDetail copyWith({
+    bool? liked,
+    int? likeCount,
+  }) {
+    return BoardDetail(
+      boardId: boardId,
+      memberId: memberId,
+      authorNickname: authorNickname,
+      title: title,
+      content: content,
+      viewCount: viewCount,
+      likeCount: likeCount ?? this.likeCount,
+      liked: liked ?? this.liked,
+      imgList: imgList,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
   factory BoardDetail.fromJson(Map<String, dynamic> json) {
     return BoardDetail(
       boardId: _intFromJson(json['boardId'] ?? json['id']),

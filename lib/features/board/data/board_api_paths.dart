@@ -10,4 +10,7 @@ class BoardApiPaths {
 
   /// GET 상세
   static String boardDetail(int boardId) => '/api/v1/boards/$boardId';
+
+  /// GET/POST/DELETE 좋아요 상태·등록·취소
+  static String boardLikes(int boardId) => '/api/v1/boards/$boardId/likes';
 }

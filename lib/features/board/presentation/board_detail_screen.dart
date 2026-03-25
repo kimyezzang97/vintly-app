@@ -9,6 +9,7 @@ import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
 import '../data/board_api_paths.dart';
 import '../data/board_detail.dart';
+import '../data/board_like_api.dart';
 
 String _formatBoardDetailDate(String iso) {
   if (iso.isEmpty) return '—';
@@ -60,6 +61,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   bool _loading = true;
   String? _errorMessage;
   BoardDetail? _detail;
+  bool _likeBusy = false;
 
   @override
   void initState() {
@@ -82,11 +84,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
       if (!mounted) return;
 
-      final code = response.code ?? response.statusCode;
+      final apiCode = response.code;
       if (response.statusCode == 401 ||
-          code == 401 ||
+          apiCode == 401 ||
           response.statusCode == 403 ||
-          code == 403) {
+          apiCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
@@ -98,7 +100,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       }
 
       final success = response.json['success'] == true;
-      if (!success || code != 200 || response.statusCode != 200) {
+      final businessOk =
+          apiCode == null || apiCode == 0 || apiCode == 200;
+      if (!success || !businessOk || response.statusCode != 200) {
         setState(() {
           _loading = false;
           _errorMessage = response.msg ?? '게시글을 불러오지 못했습니다.';
@@ -124,6 +128,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           _detail = detail;
           _errorMessage = null;
         });
+        await _syncLikesQuiet();
       } catch (_) {
         setState(() {
           _loading = false;
@@ -138,6 +143,86 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         _errorMessage = '네트워크 오류: $e';
         _detail = null;
       });
+    }
+  }
+
+  /// GET /boards/{id}/likes 로 표시용 좋아요 상태를 맞춥니다. 실패해도 상세 조회 값을 유지합니다.
+  Future<void> _syncLikesQuiet() async {
+    if (!mounted || _detail == null) return;
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    try {
+      final response = await boardGetLikes(baseUrl, widget.boardId);
+      if (!mounted) return;
+      final syncCode = response.code;
+      if (response.statusCode == 401 ||
+          syncCode == 401 ||
+          response.statusCode == 403 ||
+          syncCode == 403) {
+        return;
+      }
+      final parsed = parseBoardLikeResponse(response);
+      if (parsed == null) return;
+      setState(() {
+        _detail = _detail!.copyWith(
+          liked: parsed.liked,
+          likeCount: parsed.likeCount,
+        );
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _toggleLike() async {
+    if (_detail == null || _likeBusy) return;
+    setState(() => _likeBusy = true);
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    final currentLiked = _detail!.liked;
+    try {
+      final response = currentLiked
+          ? await boardDeleteLike(baseUrl, widget.boardId)
+          : await boardPostLike(baseUrl, widget.boardId);
+
+      if (!mounted) return;
+
+      final likeApiCode = response.code;
+      if (response.statusCode == 401 ||
+          likeApiCode == 401 ||
+          response.statusCode == 403 ||
+          likeApiCode == 403) {
+        setState(() => _likeBusy = false);
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return;
+      }
+
+      final parsed = parseBoardLikeResponse(response);
+      if (parsed == null) {
+        setState(() => _likeBusy = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.msg ?? '좋아요 처리에 실패했습니다.')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _likeBusy = false;
+        _detail = _detail!.copyWith(
+          liked: parsed.liked,
+          likeCount: parsed.likeCount,
+        );
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _likeBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('좋아요 처리 중 오류: $e')),
+      );
     }
   }
 
@@ -192,6 +277,8 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                         child: _DetailBody(
                           detail: _detail!,
                           baseUrl: baseUrl,
+                          likeBusy: _likeBusy,
+                          onLikeTap: _toggleLike,
                         ),
                       ),
                     ),
@@ -203,10 +290,14 @@ class _DetailBody extends StatelessWidget {
   const _DetailBody({
     required this.detail,
     required this.baseUrl,
+    required this.likeBusy,
+    required this.onLikeTap,
   });
 
   final BoardDetail detail;
   final String baseUrl;
+  final bool likeBusy;
+  final VoidCallback onLikeTap;
 
   @override
   Widget build(BuildContext context) {
@@ -254,16 +345,47 @@ class _DetailBody extends StatelessWidget {
               ),
             ),
             Text('·', style: TextStyle(color: cs.outline)),
-            Icon(
-              detail.liked ? Icons.favorite : Icons.favorite_border,
-              size: 18,
-              color: detail.liked ? cs.primary : cs.onSurfaceVariant,
-            ),
-            Text(
-              '${detail.likeCount}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: likeBusy ? null : onLikeTap,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (likeBusy)
+                        SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cs.primary,
+                          ),
+                        )
+                      else
+                        Icon(
+                          detail.liked
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          size: 18,
+                          color: detail.liked
+                              ? cs.primary
+                              : cs.onSurfaceVariant,
+                        ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${detail.likeCount}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
