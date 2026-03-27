@@ -13,4 +13,12 @@ class BoardApiPaths {
 
   /// GET/POST/DELETE 좋아요 상태·등록·취소
   static String boardLikes(int boardId) => '/api/v1/boards/$boardId/likes';
+
+  /// POST 댓글 등록
+  static String boardComments(int boardId) =>
+      '/api/v1/boards/$boardId/comments';
+
+  /// PUT/DELETE 댓글
+  static String boardComment(int boardId, int commentId) =>
+      '/api/v1/boards/$boardId/comments/$commentId';
 }

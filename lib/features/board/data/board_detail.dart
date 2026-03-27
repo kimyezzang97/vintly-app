@@ -1,5 +1,7 @@
 // GET /api/v1/boards/{id} 응답 data 필드와 1:1 대응.
 
+import 'board_comment.dart';
+
 class BoardDetail {
   const BoardDetail({
     required this.boardId,
@@ -11,6 +13,7 @@ class BoardDetail {
     required this.likeCount,
     required this.liked,
     required this.imgList,
+    required this.comments,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -25,12 +28,14 @@ class BoardDetail {
   final bool liked;
   /// API 원본 경로(상대/절대 URL). 화면에서 baseUrl과 합쳐 사용.
   final List<String> imgList;
+  final List<BoardComment> comments;
   final String createdAt;
   final String updatedAt;
 
   BoardDetail copyWith({
     bool? liked,
     int? likeCount,
+    List<BoardComment>? comments,
   }) {
     return BoardDetail(
       boardId: boardId,
@@ -42,6 +47,7 @@ class BoardDetail {
       likeCount: likeCount ?? this.likeCount,
       liked: liked ?? this.liked,
       imgList: imgList,
+      comments: comments ?? this.comments,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -58,9 +64,23 @@ class BoardDetail {
       likeCount: _intFromJson(json['likeCount']),
       liked: json['liked'] == true,
       imgList: _imgListFromJson(json['imgList']),
+      comments: _commentsFromJson(json['comments']),
       createdAt: _stringFromJson(json['createdAt']),
       updatedAt: _stringFromJson(json['updatedAt']),
     );
+  }
+
+  static List<BoardComment> _commentsFromJson(dynamic raw) {
+    if (raw is! List) return [];
+    final out = <BoardComment>[];
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        try {
+          out.add(BoardComment.fromJson(item));
+        } catch (_) {}
+      }
+    }
+    return out;
   }
 
   static int _intFromJson(dynamic v) {

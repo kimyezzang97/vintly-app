@@ -22,10 +22,6 @@ import 'board_api_paths.dart';
   return (liked: liked, likeCount: likeCount);
 }
 
-Future<ApiResponse> boardGetLikes(String baseUrl, int boardId) {
-  return getJsonWithAuth(baseUrl, BoardApiPaths.boardLikes(boardId));
-}
-
 Future<ApiResponse> boardPostLike(String baseUrl, int boardId) {
   return postJsonWithAuth(baseUrl, BoardApiPaths.boardLikes(boardId), body: const {});
 }

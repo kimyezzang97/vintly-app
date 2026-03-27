@@ -8,11 +8,34 @@ import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
 import '../data/board_api_paths.dart';
+import '../data/board_comment.dart';
+import '../data/board_comment_api.dart';
 import '../data/board_detail.dart';
 import '../data/board_like_api.dart';
 
 String _formatBoardDetailDate(String iso) {
   if (iso.isEmpty) return '—';
+  final dt = DateTime.tryParse(iso);
+  if (dt != null) {
+    return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')} '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+  return iso.length > 16 ? iso.substring(0, 16) : iso;
+}
+
+/// true면 수정 시각이 등록과 다름 — 같으면(또는 파싱상 동일 시각) 수정 행 미표시.
+bool _boardShowUpdatedLine(String created, String updated) {
+  if (updated.trim().isEmpty) return false;
+  final c = DateTime.tryParse(created.trim());
+  final u = DateTime.tryParse(updated.trim());
+  if (c != null && u != null) {
+    return c.toUtc().millisecondsSinceEpoch != u.toUtc().millisecondsSinceEpoch;
+  }
+  return updated.trim() != created.trim();
+}
+
+String _formatBoardCommentDate(String iso) {
+  if (iso.isEmpty) return '';
   final dt = DateTime.tryParse(iso);
   if (dt != null) {
     return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')} '
@@ -62,6 +85,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   String? _errorMessage;
   BoardDetail? _detail;
   bool _likeBusy = false;
+  final ScrollController _bodyScrollController = ScrollController();
 
   @override
   void initState() {
@@ -69,12 +93,28 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _bodyScrollController.dispose();
+    super.dispose();
+  }
 
+  /// 댓글 입력창이 보이도록 본문 스크롤을 맨 아래로 내립니다.
+  void _scrollToCommentInput() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_bodyScrollController.hasClients) return;
+      final pos = _bodyScrollController.position;
+      _bodyScrollController.animateTo(
+        pos.maxScrollExtent,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  /// 상세 API 한 번 호출. 401/403이면 로그인으로 보내고 `(null, null)` 반환.
+  /// `(detail, null)` 성공, `(null, 메시지)` 실패.
+  Future<(BoardDetail?, String?)> _fetchBoardDetail() async {
     try {
       final baseUrl = AppConfig.instance.backend.baseUrl;
       final response = await getJsonWithAuth(
@@ -82,7 +122,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         BoardApiPaths.boardDetail(widget.boardId),
       );
 
-      if (!mounted) return;
+      if (!mounted) return (null, null);
 
       final apiCode = response.code;
       if (response.statusCode == 401 ||
@@ -91,84 +131,256 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           apiCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
-        if (!mounted) return;
+        if (!mounted) return (null, null);
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppRoutes.login,
           (route) => false,
         );
-        return;
+        return (null, null);
       }
 
       final success = response.json['success'] == true;
       final businessOk =
           apiCode == null || apiCode == 0 || apiCode == 200;
       if (!success || !businessOk || response.statusCode != 200) {
-        setState(() {
-          _loading = false;
-          _errorMessage = response.msg ?? '게시글을 불러오지 못했습니다.';
-          _detail = null;
-        });
-        return;
+        return (
+          null,
+          response.msg ?? '게시글을 불러오지 못했습니다.',
+        );
       }
 
       final data = response.json['data'];
       if (data is! Map<String, dynamic>) {
-        setState(() {
-          _loading = false;
-          _errorMessage = '응답 형식이 올바르지 않습니다.';
-          _detail = null;
-        });
-        return;
+        return (null, '응답 형식이 올바르지 않습니다.');
       }
 
       try {
         final detail = BoardDetail.fromJson(data);
-        setState(() {
-          _loading = false;
-          _detail = detail;
-          _errorMessage = null;
-        });
-        await _syncLikesQuiet();
+        return (detail, null);
       } catch (_) {
-        setState(() {
-          _loading = false;
-          _errorMessage = '게시글 정보를 해석하지 못했습니다.';
-          _detail = null;
-        });
+        return (null, '게시글 정보를 해석하지 못했습니다.');
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _errorMessage = '네트워크 오류: $e';
-        _detail = null;
-      });
+      return (null, '네트워크 오류: $e');
     }
   }
 
-  /// GET /boards/{id}/likes 로 표시용 좋아요 상태를 맞춥니다. 실패해도 상세 조회 값을 유지합니다.
-  Future<void> _syncLikesQuiet() async {
-    if (!mounted || _detail == null) return;
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    final result = await _fetchBoardDetail();
+    if (!mounted) return;
+
+    final detail = result.$1;
+    final err = result.$2;
+    if (detail == null && err == null) return;
+
+    setState(() {
+      _loading = false;
+      _detail = detail;
+      _errorMessage = detail == null ? err : null;
+    });
+  }
+
+  Future<void> _refreshBoardDetailSilently() async {
+    final result = await _fetchBoardDetail();
+    if (!mounted) return;
+    final detail = result.$1;
+    if (detail == null) return;
+    setState(() => _detail = detail);
+  }
+
+  Future<bool> _postBoardComment(String text, int parentCommentId) async {
     final baseUrl = AppConfig.instance.backend.baseUrl;
     try {
-      final response = await boardGetLikes(baseUrl, widget.boardId);
-      if (!mounted) return;
-      final syncCode = response.code;
+      final response = await boardPostComment(
+        baseUrl,
+        widget.boardId,
+        parentCommentId: parentCommentId,
+        comment: text,
+      );
+      if (!mounted) return false;
+      final apiCode = response.code;
       if (response.statusCode == 401 ||
-          syncCode == 401 ||
+          apiCode == 401 ||
           response.statusCode == 403 ||
-          syncCode == 403) {
-        return;
-      }
-      final parsed = parseBoardLikeResponse(response);
-      if (parsed == null) return;
-      setState(() {
-        _detail = _detail!.copyWith(
-          liked: parsed.liked,
-          likeCount: parsed.likeCount,
+          apiCode == 403) {
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return false;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
         );
-      });
-    } catch (_) {}
+        return false;
+      }
+      if (!boardCommentMutationOk(response)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.msg ?? '댓글 등록에 실패했습니다.')),
+        );
+        return false;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('댓글이 등록되었습니다.')),
+      );
+      await _refreshBoardDetailSilently();
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('댓글 등록 중 오류: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _putBoardComment(int commentId, String text) async {
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    try {
+      final response = await boardPutComment(
+        baseUrl,
+        widget.boardId,
+        commentId: commentId,
+        comment: text,
+      );
+      if (!mounted) return false;
+      final apiCode = response.code;
+      if (response.statusCode == 401 ||
+          apiCode == 401 ||
+          response.statusCode == 403 ||
+          apiCode == 403) {
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return false;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return false;
+      }
+      if (!boardCommentMutationOk(response)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.msg ?? '댓글 수정에 실패했습니다.')),
+        );
+        return false;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('댓글이 수정되었습니다.')),
+      );
+      await _refreshBoardDetailSilently();
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('댓글 수정 중 오류: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _deleteBoardComment(int commentId) async {
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    try {
+      final response = await boardDeleteComment(
+        baseUrl,
+        widget.boardId,
+        commentId: commentId,
+      );
+      if (!mounted) return false;
+      final apiCode = response.code;
+      if (response.statusCode == 401 ||
+          apiCode == 401 ||
+          response.statusCode == 403 ||
+          apiCode == 403) {
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return false;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return false;
+      }
+      if (!boardCommentMutationOk(response)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.msg ?? '댓글 삭제에 실패했습니다.')),
+        );
+        return false;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('댓글이 삭제되었습니다.')),
+      );
+      await _refreshBoardDetailSilently();
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('댓글 삭제 중 오류: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<String?> _showEditBoardCommentDialog(String initial) async {
+    final controller = TextEditingController(text: initial);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('댓글 수정'),
+        content: TextField(
+          controller: controller,
+          minLines: 1,
+          maxLines: 4,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '댓글 내용',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final t = controller.text.trim();
+              Navigator.of(ctx).pop(t.isEmpty ? null : t);
+            },
+            child: const Text('수정'),
+          ),
+        ],
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    return result;
+  }
+
+  Future<bool> _confirmDeleteBoardComment() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('댓글 삭제'),
+        content: const Text('이 댓글을 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
   }
 
   Future<void> _toggleLike() async {
@@ -272,6 +484,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: SingleChildScrollView(
+                        controller: _bodyScrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                         child: _DetailBody(
@@ -279,6 +492,19 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                           baseUrl: baseUrl,
                           likeBusy: _likeBusy,
                           onLikeTap: _toggleLike,
+                          onScrollToCommentInput: _scrollToCommentInput,
+                          onPostComment: _postBoardComment,
+                          onEditComment: (c) async {
+                            final text =
+                                await _showEditBoardCommentDialog(c.content);
+                            if (text == null || !mounted) return false;
+                            return _putBoardComment(c.commentId, text);
+                          },
+                          onDeleteComment: (c) async {
+                            final ok = await _confirmDeleteBoardComment();
+                            if (!ok || !mounted) return false;
+                            return _deleteBoardComment(c.commentId);
+                          },
                         ),
                       ),
                     ),
@@ -292,12 +518,20 @@ class _DetailBody extends StatelessWidget {
     required this.baseUrl,
     required this.likeBusy,
     required this.onLikeTap,
+    required this.onScrollToCommentInput,
+    required this.onPostComment,
+    required this.onEditComment,
+    required this.onDeleteComment,
   });
 
   final BoardDetail detail;
   final String baseUrl;
   final bool likeBusy;
   final VoidCallback onLikeTap;
+  final VoidCallback onScrollToCommentInput;
+  final Future<bool> Function(String comment, int parentCommentId) onPostComment;
+  final Future<bool> Function(BoardComment c) onEditComment;
+  final Future<bool> Function(BoardComment c) onDeleteComment;
 
   @override
   Widget build(BuildContext context) {
@@ -397,8 +631,7 @@ class _DetailBody extends StatelessWidget {
             color: cs.onSurfaceVariant,
           ),
         ),
-        if (detail.updatedAt.isNotEmpty &&
-            detail.updatedAt != detail.createdAt)
+        if (_boardShowUpdatedLine(detail.createdAt, detail.updatedAt))
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
@@ -413,7 +646,456 @@ class _DetailBody extends StatelessWidget {
           detail.content,
           style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
         ),
+        const SizedBox(height: 28),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: cs.outline.withValues(alpha: 0.18),
+        ),
+        const SizedBox(height: 16),
+        _BoardCommentSection(
+          comments: detail.comments,
+          onScrollToCommentInput: onScrollToCommentInput,
+          onPostComment: onPostComment,
+          onEditComment: onEditComment,
+          onDeleteComment: onDeleteComment,
+        ),
       ],
+    );
+  }
+}
+
+class _BoardCommentSection extends StatefulWidget {
+  const _BoardCommentSection({
+    required this.comments,
+    required this.onScrollToCommentInput,
+    required this.onPostComment,
+    required this.onEditComment,
+    required this.onDeleteComment,
+  });
+
+  final List<BoardComment> comments;
+  final VoidCallback onScrollToCommentInput;
+  final Future<bool> Function(String comment, int parentCommentId) onPostComment;
+  final Future<bool> Function(BoardComment c) onEditComment;
+  final Future<bool> Function(BoardComment c) onDeleteComment;
+
+  @override
+  State<_BoardCommentSection> createState() => _BoardCommentSectionState();
+}
+
+class _BoardCommentSectionState extends State<_BoardCommentSection> {
+  final TextEditingController _inputController = TextEditingController();
+  final FocusNode _inputFocusNode = FocusNode();
+  BoardComment? _replyingTo;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _inputController.dispose();
+    _inputFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _scrollToInputAndFocus() {
+    widget.onScrollToCommentInput();
+    Future<void>.delayed(const Duration(milliseconds: 340), () {
+      if (mounted) _inputFocusNode.requestFocus();
+    });
+  }
+
+  /// 빈티지 댓글과 동일: 루트(parent==0) 아래에 직계 답글만 묶고, 각 단계는 작성 시각 오래된 순.
+  List<({BoardComment c, bool isReply})> _flattenComments() {
+    final all = widget.comments;
+    final out = <({BoardComment c, bool isReply})>[];
+    int cmpTime(BoardComment a, BoardComment b) =>
+        a.createdAt.compareTo(b.createdAt);
+
+    final tops = all.where((c) => c.parentCommentId == 0).toList()..sort(cmpTime);
+    for (final p in tops) {
+      out.add((c: p, isReply: false));
+      final replies = all.where((c) => c.parentCommentId == p.commentId).toList()
+        ..sort(cmpTime);
+      for (final r in replies) {
+        out.add((c: r, isReply: true));
+      }
+    }
+    return out;
+  }
+
+  Future<void> _submit() async {
+    final text = _inputController.text.trim();
+    if (text.isEmpty || _submitting) return;
+    setState(() => _submitting = true);
+    final parentId = _replyingTo?.commentId ?? 0;
+    final ok = await widget.onPostComment(text, parentId);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (ok) {
+      _inputController.clear();
+      setState(() => _replyingTo = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final currentMid = CurrentUserHolder.memberId;
+    final flat = _flattenComments();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              '댓글',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${widget.comments.length}',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_replyingTo != null) ...[
+          const SizedBox(height: 10),
+          Material(
+            color: cs.primaryContainer.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${_replyingTo!.nickname.isEmpty ? '작성자' : _replyingTo!.nickname}님에게 답글',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    tooltip: '답글 취소',
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() => _replyingTo = null),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        if (flat.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: cs.outline.withValues(alpha: 0.12),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '아직 댓글이 없습니다.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          ...flat.map((e) {
+            final c = e.c;
+            final isReply = e.isReply;
+            final isMine =
+                currentMid != null && c.memberId == currentMid;
+            return _BoardCommentTile(
+              comment: c,
+              isReply: isReply,
+              isMine: isMine,
+              onTapForInput: _scrollToInputAndFocus,
+              onReply: isReply
+                  ? null
+                  : () {
+                      setState(() => _replyingTo = c);
+                      _scrollToInputAndFocus();
+                    },
+              onEdit: isMine
+                  ? () async {
+                      await widget.onEditComment(c);
+                    }
+                  : null,
+              onDelete: isMine
+                  ? () async {
+                      await widget.onDeleteComment(c);
+                    }
+                  : null,
+            );
+          }),
+        const SizedBox(height: 16),
+        Material(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _inputController,
+                    focusNode: _inputFocusNode,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
+                    enabled: !_submitting,
+                    decoration: InputDecoration(
+                      hintText: _replyingTo != null
+                          ? '답글을 입력하세요'
+                          : '댓글을 입력하세요',
+                      hintStyle: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 10,
+                      ),
+                    ),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                _submitting
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : IconButton.filledTonal(
+                        onPressed: _submit,
+                        tooltip: '등록',
+                        icon: const Icon(Icons.send_rounded, size: 22),
+                      ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BoardCommentTile extends StatelessWidget {
+  const _BoardCommentTile({
+    required this.comment,
+    required this.isReply,
+    required this.isMine,
+    required this.onTapForInput,
+    this.onReply,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  final BoardComment comment;
+  final bool isReply;
+  final bool isMine;
+  final VoidCallback onTapForInput;
+  final VoidCallback? onReply;
+  final Future<void> Function()? onEdit;
+  final Future<void> Function()? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final nick =
+        comment.nickname.isNotEmpty ? comment.nickname : '익명';
+    final initial = nick.isNotEmpty ? nick[0].toUpperCase() : '?';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isReply)
+            Container(
+              width: 3,
+              margin: const EdgeInsets.only(right: 10, top: 6),
+              constraints: const BoxConstraints(minHeight: 36),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          CircleAvatar(
+            radius: isReply ? 14 : 18,
+            backgroundColor: cs.primaryContainer,
+            foregroundColor: cs.onPrimaryContainer,
+            child: Text(
+              initial,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: isReply ? 12 : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTapForInput,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              nick,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                                fontSize: isReply ? 12 : null,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatBoardCommentDate(comment.createdAt),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              fontSize: isReply ? 11 : null,
+                            ),
+                          ),
+                          if (comment.edited) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '(수정됨)',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                fontSize: isReply ? 11 : null,
+                              ),
+                            ),
+                          ],
+                          if (onReply != null) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: onReply,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.reply_outlined,
+                                      size: 16,
+                                      color: cs.primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '답글',
+                                      style:
+                                          theme.textTheme.labelSmall?.copyWith(
+                                        color: cs.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (isMine && (onEdit != null || onDelete != null)) ...[
+                            const SizedBox(width: 4),
+                            if (onEdit != null)
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onEdit!(),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 6,
+                                  ),
+                                  child: Text(
+                                    '수정',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: cs.outline,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (onDelete != null)
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () => onDelete!(),
+                                child: Text(
+                                  '삭제',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: cs.error,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        comment.content,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: isReply ? 13 : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
