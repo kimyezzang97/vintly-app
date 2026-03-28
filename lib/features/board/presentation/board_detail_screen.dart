@@ -535,6 +535,18 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             PopupMenuButton<String>(
               enabled: !_deleteBusy,
               tooltip: '더보기',
+              padding: EdgeInsets.zero,
+              color: Colors.white,
+              elevation: 3,
+              shadowColor: Colors.black26,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 118,
+                maxWidth: 118,
+              ),
               icon: _deleteBusy
                   ? SizedBox(
                       width: 24,
@@ -566,16 +578,55 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   await _deleteBoard();
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
+              itemBuilder: (popupContext) => [
+                PopupMenuItem(
                   value: 'edit',
-                  child: Text('수정'),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  height: 44,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: cs.onSurface,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '수정',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: Text(
-                    '삭제',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  height: 44,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      const Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '삭제',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
