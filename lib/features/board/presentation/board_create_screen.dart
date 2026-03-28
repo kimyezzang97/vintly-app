@@ -1,7 +1,10 @@
 // =============================================================================
 // 게시글 작성 — POST /api/v1/boards multipart (title, content, images≤10)
+// 게시글 수정 — PATCH /api/v1/boards/{id} multipart
+//   title, content, raminImgIdList(JSON 배열), imgList(신규 파일)
 // =============================================================================
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,10 +15,52 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../data/board_api.dart';
 import '../data/board_api_paths.dart';
+import '../data/board_detail.dart';
+
+String _boardCreateResolveImageUrl(String baseUrl, String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return '';
+  final lower = trimmed.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://')) {
+    return trimmed;
+  }
+  final base = baseUrl.replaceAll(RegExp(r'/$'), '');
+  return trimmed.startsWith('/') ? '$base$trimmed' : '$base/$trimmed';
+}
+
+Map<String, String>? _boardCreateImageHeaders(
+  String baseUrl,
+  String imageUrl,
+  String? access,
+) {
+  if (access == null || access.isEmpty) return null;
+  final imageUri = Uri.tryParse(imageUrl);
+  final baseUri = Uri.tryParse(baseUrl);
+  if (imageUri == null || baseUri == null || !imageUri.hasScheme) return null;
+  if (imageUri.host.isEmpty) return null;
+  if (imageUri.host != baseUri.host || imageUri.port != baseUri.port) {
+    return null;
+  }
+  return {'access': access};
+}
 
 class BoardCreateScreen extends StatefulWidget {
-  const BoardCreateScreen({super.key});
+  const BoardCreateScreen({
+    super.key,
+    this.editBoardId,
+    this.initialTitle,
+    this.initialContent,
+    this.existingImages = const [],
+  });
+
+  /// null이면 신규 작성, 있으면 [PATCH] 수정.
+  final int? editBoardId;
+  final String? initialTitle;
+  final String? initialContent;
+  /// 수정 시 유지할 기존 이미지 (삭제한 항목은 [raminImgIdList]에서 빠짐).
+  final List<BoardDetailImageRef> existingImages;
 
   @override
   State<BoardCreateScreen> createState() => _BoardCreateScreenState();
@@ -27,7 +72,24 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final List<XFile> _images = [];
+  List<BoardDetailImageRef> _retainedExisting = [];
   bool _submitting = false;
+
+  bool get _isEdit => widget.editBoardId != null;
+
+  int get _totalImageCount => _retainedExisting.length + _images.length;
+
+  @override
+  void initState() {
+    super.initState();
+    final t = widget.initialTitle;
+    if (t != null && t.isNotEmpty) _titleController.text = t;
+    final c = widget.initialContent;
+    if (c != null && c.isNotEmpty) _contentController.text = c;
+    if (_isEdit) {
+      _retainedExisting = List<BoardDetailImageRef>.from(widget.existingImages);
+    }
+  }
 
   @override
   void dispose() {
@@ -37,7 +99,7 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
   }
 
   Future<void> _pickImages() async {
-    final remaining = _maxImages - _images.length;
+    final remaining = _maxImages - _totalImageCount;
     if (remaining <= 0) return;
 
     final picker = ImagePicker();
@@ -56,6 +118,10 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
 
   void _removeAt(int i) {
     setState(() => _images.removeAt(i));
+  }
+
+  void _removeRetainedExistingAt(int i) {
+    setState(() => _retainedExisting.removeAt(i));
   }
 
   String _filenameFor(XFile x, int index) {
@@ -84,6 +150,23 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
     }
 
     if (_submitting) return;
+
+    if (_isEdit) {
+      for (final r in _retainedExisting) {
+        if (r.imgId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '일부 기존 이미지에 ID가 없어 서버에 유지 요청을 할 수 없습니다. '
+                '해당 사진을 목록에서 제거한 뒤 다시 추가해 주세요.',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -96,21 +179,35 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
         files.add((filename: fn, bytes: bytes, contentType: _contentTypeFor(fn)));
       }
 
-      final response = await postMultipartWithAuth(
-        baseUrl,
-        BoardApiPaths.createBoard,
-        fields: {
-          'title': title,
-          'content': content,
-        },
-        fileFieldName: 'images',
-        files: files,
-      );
+      final response = _isEdit
+          ? await boardPatchUpdate(
+              baseUrl,
+              widget.editBoardId!,
+              title: title,
+              content: content,
+              raminImgIdListJson: jsonEncode(
+                _retainedExisting.map((e) => e.imgId!).toList(),
+              ),
+              newImageFiles: files,
+            )
+          : await postMultipartWithAuth(
+              baseUrl,
+              BoardApiPaths.createBoard,
+              fields: {
+                'title': title,
+                'content': content,
+              },
+              fileFieldName: 'images',
+              files: files,
+            );
 
       if (!mounted) return;
 
-      final code = response.code ?? response.statusCode;
-      if (response.statusCode == 401 || code == 401 || response.statusCode == 403 || code == 403) {
+      final apiCode = response.code;
+      if (response.statusCode == 401 ||
+          apiCode == 401 ||
+          response.statusCode == 403 ||
+          apiCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
@@ -121,16 +218,28 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
         return;
       }
 
-      final ok = response.json['success'] == true &&
-          (response.statusCode == 200 || response.statusCode == 201) &&
-          (code == 200 || code == 201);
-      if (ok) {
+      final businessOk =
+          response.json.isEmpty || response.json['success'] == true;
+      final statusOk = response.statusCode == 200 ||
+          response.statusCode == 201 ||
+          response.statusCode == 204;
+      final codeOk = apiCode == null ||
+          apiCode == 0 ||
+          apiCode == 200 ||
+          apiCode == 201 ||
+          apiCode == 204;
+      if (businessOk && statusOk && codeOk) {
         Navigator.of(context).pop(true);
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response.msg ?? '등록에 실패했습니다.')),
+        SnackBar(
+          content: Text(
+            response.msg ??
+                (_isEdit ? '수정에 실패했습니다.' : '등록에 실패했습니다.'),
+          ),
+        ),
       );
     } catch (e) {
       if (mounted) {
@@ -151,7 +260,7 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('글 작성'),
+        title: Text(_isEdit ? '글 수정' : '글 작성'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(
@@ -172,13 +281,89 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                       color: cs.primary,
                     ),
                   )
-                : const Text('등록'),
+                : Text(_isEdit ? '저장' : '등록'),
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_isEdit && _retainedExisting.isNotEmpty) ...[
+            Text(
+              '유지할 기존 이미지 (×로 제거)',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 96,
+              child: FutureBuilder<String?>(
+                future: TokenStorage.getAccessToken(),
+                builder: (context, snap) {
+                  final access = snap.data;
+                  final baseUrl = AppConfig.instance.backend.baseUrl;
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _retainedExisting.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final ref = _retainedExisting[index];
+                      final resolved = _boardCreateResolveImageUrl(
+                        baseUrl,
+                        ref.path,
+                      );
+                      if (resolved.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      final headers = _boardCreateImageHeaders(
+                        baseUrl,
+                        resolved,
+                        access,
+                      );
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              resolved,
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
+                              headers: headers,
+                              errorBuilder: (_, _, _) => ColoredBox(
+                                color: cs.surfaceContainerHighest,
+                                child: const Center(
+                                  child: Icon(Icons.image_not_supported_outlined),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: IconButton.filled(
+                              style: IconButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                fixedSize: const Size(28, 28),
+                              ),
+                              onPressed: _submitting
+                                  ? null
+                                  : () => _removeRetainedExistingAt(index),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           TextField(
             controller: _titleController,
             decoration: const InputDecoration(
@@ -211,8 +396,9 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
               ),
               const Spacer(),
               FilledButton.tonalIcon(
-                onPressed:
-                    _images.length >= _maxImages || _submitting ? null : _pickImages,
+                onPressed: _totalImageCount >= _maxImages || _submitting
+                    ? null
+                    : _pickImages,
                 icon: const Icon(Icons.add_photo_alternate_outlined),
                 label: const Text('사진'),
               ),

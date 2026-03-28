@@ -169,12 +169,13 @@ class _BoardScreenState extends State<BoardScreen> {
 
   Future<void> _onRefresh() => _loadPage(_currentPage);
 
-  void _openBoardDetail(int boardId) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+  Future<void> _openBoardDetail(int boardId) async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => BoardDetailScreen(boardId: boardId),
       ),
     );
+    if (deleted == true && mounted) _loadPage(_currentPage);
   }
 
   int get _listItemCount {

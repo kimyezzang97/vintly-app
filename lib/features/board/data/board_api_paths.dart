@@ -8,7 +8,7 @@ class BoardApiPaths {
   /// POST multipart: title, content, images (max 10)
   static const String createBoard = boards;
 
-  /// GET 상세
+  /// GET 상세 · PATCH 수정(multipart) · DELETE 게시글 (작성자)
   static String boardDetail(int boardId) => '/api/v1/boards/$boardId';
 
   /// GET/POST/DELETE 좋아요 상태·등록·취소

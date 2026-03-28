@@ -7,11 +7,13 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../data/board_api.dart';
 import '../data/board_api_paths.dart';
 import '../data/board_comment.dart';
 import '../data/board_comment_api.dart';
 import '../data/board_detail.dart';
 import '../data/board_like_api.dart';
+import 'board_create_screen.dart';
 
 String _formatBoardDetailDate(String iso) {
   if (iso.isEmpty) return '—';
@@ -85,6 +87,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   String? _errorMessage;
   BoardDetail? _detail;
   bool _likeBusy = false;
+  bool _deleteBusy = false;
   final ScrollController _bodyScrollController = ScrollController();
 
   @override
@@ -383,6 +386,79 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     return ok == true;
   }
 
+  Future<bool> _confirmDeleteBoard() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('게시글 삭제'),
+        content: const Text('이 게시글을 삭제할까요? 삭제 후에는 복구할 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _deleteBoard() async {
+    if (_detail == null || _deleteBusy) return;
+    final ok = await _confirmDeleteBoard();
+    if (!ok || !mounted) return;
+
+    setState(() => _deleteBusy = true);
+    final baseUrl = AppConfig.instance.backend.baseUrl;
+    try {
+      final response = await boardDelete(baseUrl, widget.boardId);
+      if (!mounted) return;
+
+      final apiCode = response.code;
+      if (response.statusCode == 401 ||
+          apiCode == 401 ||
+          response.statusCode == 403 ||
+          apiCode == 403) {
+        setState(() => _deleteBusy = false);
+        await TokenStorage.clearAll();
+        CurrentUserHolder.clear();
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.login,
+          (route) => false,
+        );
+        return;
+      }
+
+      if (!boardDeleteMutationOk(response)) {
+        setState(() => _deleteBusy = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.msg ?? '게시글 삭제에 실패했습니다.')),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시글이 삭제되었습니다.')),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleteBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('게시글 삭제 중 오류: $e')),
+      );
+    }
+  }
+
   Future<void> _toggleLike() async {
     if (_detail == null || _likeBusy) return;
     setState(() => _likeBusy = true);
@@ -444,9 +520,67 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     final cs = theme.colorScheme;
     final baseUrl = AppConfig.instance.backend.baseUrl;
 
+    final currentMid = CurrentUserHolder.memberId;
+    final showOwnerMenu = !_loading &&
+        _errorMessage == null &&
+        _detail != null &&
+        currentMid != null &&
+        _detail!.memberId == currentMid;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('게시글'),
+        actions: [
+          if (showOwnerMenu)
+            PopupMenuButton<String>(
+              enabled: !_deleteBusy,
+              tooltip: '더보기',
+              icon: _deleteBusy
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    )
+                  : const Icon(Icons.more_horiz),
+              onSelected: (value) async {
+                if (value == 'edit') {
+                  final d = _detail;
+                  if (!mounted || d == null) return;
+                  final ok = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute<bool>(
+                      builder: (_) => BoardCreateScreen(
+                        editBoardId: widget.boardId,
+                        initialTitle: d.title,
+                        initialContent: d.content,
+                        existingImages: List<BoardDetailImageRef>.from(
+                          d.imageRefs,
+                        ),
+                      ),
+                    ),
+                  );
+                  if (ok == true && mounted) await _load();
+                } else if (value == 'delete') {
+                  await _deleteBoard();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('수정'),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    '삭제',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              ],
+            ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(
@@ -969,129 +1103,134 @@ class _BoardCommentTile extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onTapForInput,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              nick,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: cs.onSurface,
-                                fontSize: isReply ? 12 : null,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatBoardCommentDate(comment.createdAt),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontSize: isReply ? 11 : null,
-                            ),
-                          ),
-                          if (comment.edited) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              '(수정됨)',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                fontSize: isReply ? 11 : null,
-                              ),
-                            ),
-                          ],
-                          if (onReply != null) ...[
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: onReply,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 6,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.reply_outlined,
-                                      size: 16,
-                                      color: cs.primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '답글',
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
-                                        color: cs.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (isMine && (onEdit != null || onDelete != null)) ...[
-                            const SizedBox(width: 4),
-                            if (onEdit != null)
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => onEdit!(),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 6,
-                                  ),
-                                  child: Text(
-                                    '수정',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: cs.outline,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            if (onDelete != null)
-                              TextButton(
-                                style: TextButton.styleFrom(
-                                  minimumSize: Size.zero,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                onPressed: () => onDelete!(),
-                                child: Text(
-                                  '삭제',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: cs.error,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        nick,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                          fontSize: isReply ? 12 : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatBoardCommentDate(comment.createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontSize: isReply ? 11 : null,
+                      ),
+                    ),
+                    if (comment.edited) ...[
+                      const SizedBox(width: 6),
                       Text(
+                        '(수정됨)',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontSize: isReply ? 11 : null,
+                        ),
+                      ),
+                    ],
+                    if (onReply != null) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onReply,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.reply_outlined,
+                                size: 16,
+                                color: cs.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '답글',
+                                style:
+                                    theme.textTheme.labelSmall?.copyWith(
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (isMine && (onEdit != null || onDelete != null)) ...[
+                      const SizedBox(width: 4),
+                      if (onEdit != null)
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                            ),
+                            tapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            foregroundColor: cs.outline,
+                          ),
+                          onPressed: () => onEdit!(),
+                          child: Text(
+                            '수정',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.outline,
+                            ),
+                          ),
+                        ),
+                      if (onDelete != null)
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                            ),
+                            tapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => onDelete!(),
+                          child: Text(
+                            '삭제',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.error,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onTapForInput,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 2,
+                        horizontal: 2,
+                      ),
+                      child: Text(
                         comment.content,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontSize: isReply ? 13 : null,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],

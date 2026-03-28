@@ -234,3 +234,81 @@ Future<ApiResponse> postMultipartWithAuth(
 
   return response;
 }
+
+/// multipart PUT (예: 게시판 글 수정). 401이면 reissue 후 한 번 재시도.
+Future<ApiResponse> putMultipartWithAuth(
+  String baseUrl,
+  String path, {
+  required Map<String, String> fields,
+  String fileFieldName = 'images',
+  required List<({String filename, List<int> bytes, String contentType})> files,
+}) async {
+  final token = await TokenStorage.getAccessToken();
+  final api = ApiClient(baseUrl: baseUrl);
+  final headers = token != null && token.isNotEmpty ? {'access': token} : null;
+
+  ApiResponse response = await api.putMultipart(
+    path,
+    headers: headers,
+    fields: fields,
+    fileFieldName: fileFieldName,
+    files: files,
+  );
+
+  if (response.statusCode == 401) {
+    final reissued = await reissueTokens(baseUrl);
+    if (reissued) {
+      final newToken = await TokenStorage.getAccessToken();
+      if (newToken != null && newToken.isNotEmpty) {
+        response = await api.putMultipart(
+          path,
+          headers: {'access': newToken},
+          fields: fields,
+          fileFieldName: fileFieldName,
+          files: files,
+        );
+      }
+    }
+  }
+
+  return response;
+}
+
+/// multipart PATCH (예: 게시판 글 수정). 401이면 reissue 후 한 번 재시도.
+Future<ApiResponse> patchMultipartWithAuth(
+  String baseUrl,
+  String path, {
+  required Map<String, String> fields,
+  String fileFieldName = 'images',
+  required List<({String filename, List<int> bytes, String contentType})> files,
+}) async {
+  final token = await TokenStorage.getAccessToken();
+  final api = ApiClient(baseUrl: baseUrl);
+  final headers = token != null && token.isNotEmpty ? {'access': token} : null;
+
+  ApiResponse response = await api.patchMultipart(
+    path,
+    headers: headers,
+    fields: fields,
+    fileFieldName: fileFieldName,
+    files: files,
+  );
+
+  if (response.statusCode == 401) {
+    final reissued = await reissueTokens(baseUrl);
+    if (reissued) {
+      final newToken = await TokenStorage.getAccessToken();
+      if (newToken != null && newToken.isNotEmpty) {
+        response = await api.patchMultipart(
+          path,
+          headers: {'access': newToken},
+          fields: fields,
+          fileFieldName: fileFieldName,
+          files: files,
+        );
+      }
+    }
+  }
+
+  return response;
+}

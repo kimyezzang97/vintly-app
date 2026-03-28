@@ -407,6 +407,208 @@ class ApiClient {
     }
   }
 
+  /// PUT `multipart/form-data` (게시글 수정 등). 필드·파일 형식은 [postMultipart]와 동일.
+  Future<ApiResponse> putMultipart(
+    String path, {
+    Map<String, String>? headers,
+    required Map<String, String> fields,
+    String fileFieldName = 'images',
+    required List<({String filename, List<int> bytes, String contentType})> files,
+  }) async {
+    final uri = _uri(path);
+    const method = 'PUT';
+    final boundary = 'dart-${DateTime.now().microsecondsSinceEpoch}';
+
+    ApiLogger.logRequest(
+      method: method,
+      uri: uri,
+      headers: headers,
+      body: {
+        'multipart': true,
+        'fields': fields,
+        'files': [for (final f in files) f.filename],
+      },
+    );
+
+    final httpClient = HttpClient();
+    try {
+      final request = await httpClient.putUrl(uri);
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'multipart/form-data; boundary=$boundary',
+      );
+      headers?.forEach((k, v) {
+        final key = k.toLowerCase();
+        if (key == 'content-type') return;
+        request.headers.add(k, v);
+      });
+
+      final builder = BytesBuilder(copy: false);
+      void addUtf8(String s) => builder.add(utf8.encode(s));
+
+      for (final e in fields.entries) {
+        addUtf8('--$boundary\r\n');
+        addUtf8('Content-Disposition: form-data; name="${e.key}"\r\n\r\n');
+        addUtf8(e.value);
+        addUtf8('\r\n');
+      }
+      for (final f in files) {
+        addUtf8('--$boundary\r\n');
+        addUtf8(
+          'Content-Disposition: form-data; name="$fileFieldName"; filename="${f.filename}"\r\n',
+        );
+        addUtf8('Content-Type: ${f.contentType}\r\n\r\n');
+        builder.add(f.bytes);
+        addUtf8('\r\n');
+      }
+      addUtf8('--$boundary--\r\n');
+
+      request.add(builder.takeBytes());
+
+      final response = await request.close();
+      final rawBody = await response.transform(utf8.decoder).join();
+
+      final headersMap = <String, List<String>>{};
+      response.headers.forEach(
+        (name, values) => headersMap[name.toLowerCase()] = List<String>.from(
+          values,
+          growable: false,
+        ),
+      );
+
+      Map<String, dynamic> json = <String, dynamic>{};
+      if (rawBody.isNotEmpty) {
+        try {
+          final dynamic decoded = jsonDecode(rawBody);
+          if (decoded is Map<String, dynamic>) {
+            json = decoded;
+          }
+        } catch (_) {}
+      }
+
+      ApiLogger.logResponse(
+        method: method,
+        uri: uri,
+        statusCode: response.statusCode,
+        headers: headersMap,
+        body: rawBody,
+      );
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        rawBody: rawBody,
+        json: json,
+        headers: headersMap,
+      );
+    } catch (e, st) {
+      ApiLogger.logError(method: method, uri: uri, error: e, stackTrace: st);
+      rethrow;
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  /// PATCH `multipart/form-data`. 필드·파일 형식은 [postMultipart]와 동일.
+  Future<ApiResponse> patchMultipart(
+    String path, {
+    Map<String, String>? headers,
+    required Map<String, String> fields,
+    String fileFieldName = 'images',
+    required List<({String filename, List<int> bytes, String contentType})> files,
+  }) async {
+    final uri = _uri(path);
+    const method = 'PATCH';
+    final boundary = 'dart-${DateTime.now().microsecondsSinceEpoch}';
+
+    ApiLogger.logRequest(
+      method: method,
+      uri: uri,
+      headers: headers,
+      body: {
+        'multipart': true,
+        'fields': fields,
+        'files': [for (final f in files) f.filename],
+      },
+    );
+
+    final httpClient = HttpClient();
+    try {
+      final request = await httpClient.patchUrl(uri);
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'multipart/form-data; boundary=$boundary',
+      );
+      headers?.forEach((k, v) {
+        final key = k.toLowerCase();
+        if (key == 'content-type') return;
+        request.headers.add(k, v);
+      });
+
+      final builder = BytesBuilder(copy: false);
+      void addUtf8(String s) => builder.add(utf8.encode(s));
+
+      for (final e in fields.entries) {
+        addUtf8('--$boundary\r\n');
+        addUtf8('Content-Disposition: form-data; name="${e.key}"\r\n\r\n');
+        addUtf8(e.value);
+        addUtf8('\r\n');
+      }
+      for (final f in files) {
+        addUtf8('--$boundary\r\n');
+        addUtf8(
+          'Content-Disposition: form-data; name="$fileFieldName"; filename="${f.filename}"\r\n',
+        );
+        addUtf8('Content-Type: ${f.contentType}\r\n\r\n');
+        builder.add(f.bytes);
+        addUtf8('\r\n');
+      }
+      addUtf8('--$boundary--\r\n');
+
+      request.add(builder.takeBytes());
+
+      final response = await request.close();
+      final rawBody = await response.transform(utf8.decoder).join();
+
+      final headersMap = <String, List<String>>{};
+      response.headers.forEach(
+        (name, values) => headersMap[name.toLowerCase()] = List<String>.from(
+          values,
+          growable: false,
+        ),
+      );
+
+      Map<String, dynamic> json = <String, dynamic>{};
+      if (rawBody.isNotEmpty) {
+        try {
+          final dynamic decoded = jsonDecode(rawBody);
+          if (decoded is Map<String, dynamic>) {
+            json = decoded;
+          }
+        } catch (_) {}
+      }
+
+      ApiLogger.logResponse(
+        method: method,
+        uri: uri,
+        statusCode: response.statusCode,
+        headers: headersMap,
+        body: rawBody,
+      );
+
+      return ApiResponse(
+        statusCode: response.statusCode,
+        rawBody: rawBody,
+        json: json,
+        headers: headersMap,
+      );
+    } catch (e, st) {
+      ApiLogger.logError(method: method, uri: uri, error: e, stackTrace: st);
+      rethrow;
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
   /// GET 요청을 보내고 JSON 응답을 반환합니다.
   /// [path] 예: '/api/v1/vintages'
   /// [headers] 예: {'access': 'xxx'} — 인증 시 access 토큰을 그대로 넣으면 됨
