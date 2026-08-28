@@ -24,7 +24,8 @@ android {
         applicationId = "com.example.vintly_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // flutter_naver_map과 현재 image_picker_android 요구사항을 충족한다.
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -1,6 +1,7 @@
 // 게시글 상세 — GET /api/v1/boards/{id}
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
@@ -14,6 +15,12 @@ import '../data/board_comment_api.dart';
 import '../data/board_detail.dart';
 import '../data/board_like_api.dart';
 import 'board_create_screen.dart';
+
+const Color _boardInk = Color(0xFF241A17);
+const Color _boardEspresso = Color(0xFF3B241C);
+const Color _boardCaramel = Color(0xFFA96F3D);
+const Color _boardBackground = Color(0xFFF4F3F1);
+const Color _boardMuted = Color(0xFF8A817D);
 
 String _formatBoardDetailDate(String iso) {
   if (iso.isEmpty) return '—';
@@ -335,20 +342,47 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('댓글 수정'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: Color(0xFFE8E1DA)),
+        ),
+        title: const Text(
+          '댓글 수정',
+          style: TextStyle(
+            color: _boardInk,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         content: TextField(
           controller: controller,
           minLines: 1,
           maxLines: 4,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: '댓글 내용',
-            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: const Color(0xFFF7F6F4),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE8E1DA)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE8E1DA)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _boardCaramel, width: 1.5),
+            ),
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
+            style: TextButton.styleFrom(foregroundColor: _boardMuted),
             child: const Text('취소'),
           ),
           FilledButton(
@@ -356,6 +390,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
               final t = controller.text.trim();
               Navigator.of(ctx).pop(t.isEmpty ? null : t);
             },
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF35424A),
+            ),
             child: const Text('수정'),
           ),
         ],
@@ -369,15 +406,32 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('댓글 삭제'),
-        content: const Text('이 댓글을 삭제할까요?'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: Color(0xFFE8E1DA)),
+        ),
+        title: const Text(
+          '댓글 삭제',
+          style: TextStyle(color: _boardInk, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          '이 댓글을 삭제할까요?',
+          style: TextStyle(color: Color(0xFF6F6560)),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(foregroundColor: _boardMuted),
             child: const Text('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFC94848),
+            ),
             child: const Text('삭제'),
           ),
         ],
@@ -390,15 +444,32 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('게시글 삭제'),
-        content: const Text('이 게시글을 삭제할까요? 삭제 후에는 복구할 수 없습니다.'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: Color(0xFFE8E1DA)),
+        ),
+        title: const Text(
+          '게시글 삭제',
+          style: TextStyle(color: _boardInk, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          '이 게시글을 삭제할까요?\n삭제 후에는 복구할 수 없습니다.',
+          style: TextStyle(color: Color(0xFF6F6560), height: 1.5),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(foregroundColor: _boardMuted),
             child: const Text('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFC94848),
+            ),
             child: const Text('삭제'),
           ),
         ],
@@ -517,7 +588,6 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     final baseUrl = AppConfig.instance.backend.baseUrl;
 
     final currentMid = CurrentUserHolder.memberId;
@@ -527,9 +597,25 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         currentMid != null &&
         _detail!.memberId == currentMid;
 
-    return Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+      backgroundColor: _boardBackground,
       appBar: AppBar(
-        title: const Text('게시글'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF35424A),
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          '커뮤니티',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: _boardEspresso,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         actions: [
           if (showOwnerMenu)
             PopupMenuButton<String>(
@@ -537,15 +623,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
               tooltip: '더보기',
               padding: EdgeInsets.zero,
               color: Colors.white,
-              elevation: 3,
-              shadowColor: Colors.black26,
+              elevation: 8,
+              shadowColor: const Color(0x26000000),
               surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFE8E1DA)),
               ),
               constraints: const BoxConstraints(
-                minWidth: 118,
-                maxWidth: 118,
+                minWidth: 136,
+                maxWidth: 136,
               ),
               icon: _deleteBusy
                   ? SizedBox(
@@ -583,7 +670,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   value: 'edit',
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  height: 44,
+                  height: 48,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     mainAxisSize: MainAxisSize.max,
@@ -591,24 +678,25 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       Icon(
                         Icons.edit_outlined,
                         size: 18,
-                        color: cs.onSurface,
+                        color: const Color(0xFF35424A),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '수정',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurface,
-                          fontWeight: FontWeight.w500,
+                          color: _boardInk,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
+                const PopupMenuDivider(height: 1),
                 PopupMenuItem(
                   value: 'delete',
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  height: 44,
+                  height: 48,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     mainAxisSize: MainAxisSize.max,
@@ -616,14 +704,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       const Icon(
                         Icons.delete_outline,
                         size: 18,
-                        color: Colors.red,
+                        color: Color(0xFFC94848),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '삭제',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFFC94848),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -637,12 +725,14 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
           child: Divider(
             height: 1,
             thickness: 1,
-            color: cs.outline.withValues(alpha: 0.2),
+            color: const Color(0xFFD8CEC6),
           ),
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: _boardCaramel),
+            )
           : _errorMessage != null
               ? Center(
                   child: Padding(
@@ -656,8 +746,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                           style: theme.textTheme.bodyLarge,
                         ),
                         const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: _load,
+                            FilledButton(
+                              onPressed: _load,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF35424A),
+                              ),
                           child: const Text('다시 시도'),
                         ),
                       ],
@@ -693,6 +786,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                         ),
                       ),
                     ),
+      ),
     );
   }
 }
@@ -721,131 +815,194 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          detail.title,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        AspectRatio(
-          aspectRatio: 1,
-          child: _BoardDetailMediaArea(
-            rawPaths: detail.imgList,
-            baseUrl: baseUrl,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Icon(Icons.person_outline, size: 18, color: cs.onSurfaceVariant),
-            Text(
-              detail.authorNickname.isEmpty ? '—' : detail.authorNickname,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE8E3DF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            detail.title,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: _boardInk,
+              fontWeight: FontWeight.w800,
+              height: 1.3,
             ),
-            Text('·', style: TextStyle(color: cs.outline)),
-            Icon(Icons.visibility_outlined,
-                size: 18, color: cs.onSurfaceVariant),
-            Text(
-              '${detail.viewCount}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 5,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                detail.authorNickname.isEmpty
+                    ? '작성자 정보 없음'
+                    : detail.authorNickname,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6F6560),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            Text('·', style: TextStyle(color: cs.outline)),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: likeBusy ? null : onLikeTap,
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (likeBusy)
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: cs.primary,
-                          ),
-                        )
-                      else
-                        Icon(
-                          detail.liked
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          size: 18,
-                          color: detail.liked
-                              ? cs.primary
-                              : cs.onSurfaceVariant,
-                        ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${detail.likeCount}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
-                  ),
+              const Text('·', style: TextStyle(color: Color(0xFFB6AAA2))),
+              const Icon(
+                Icons.visibility_outlined,
+                size: 15,
+                color: _boardMuted,
+              ),
+              Text(
+                '${detail.viewCount}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _boardMuted,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const Text('·', style: TextStyle(color: Color(0xFFB6AAA2))),
+              Text(
+                _formatBoardDetailDate(detail.createdAt),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _boardMuted,
+                ),
+              ),
+            ],
+          ),
+          if (_boardShowUpdatedLine(detail.createdAt, detail.updatedAt))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '수정 ${_formatBoardDetailDate(detail.updatedAt)}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: _boardMuted,
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '등록 ${_formatBoardDetailDate(detail.createdAt)}',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: cs.onSurfaceVariant,
-          ),
-        ),
-        if (_boardShowUpdatedLine(detail.createdAt, detail.updatedAt))
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              '수정 ${_formatBoardDetailDate(detail.updatedAt)}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: cs.onSurfaceVariant,
+          if (detail.imgList.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            AspectRatio(
+              aspectRatio: 1,
+              child: _BoardDetailMediaArea(
+                rawPaths: detail.imgList,
+                baseUrl: baseUrl,
               ),
             ),
+          ],
+          const SizedBox(height: 22),
+          SelectableText(
+            detail.content,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: _boardInk,
+              height: 1.6,
+            ),
           ),
-        const SizedBox(height: 12),
-        SelectableText(
-          detail.content,
-          style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
-        ),
-        const SizedBox(height: 28),
-        Divider(
-          height: 1,
-          thickness: 1,
-          color: cs.outline.withValues(alpha: 0.18),
-        ),
-        const SizedBox(height: 16),
-        _BoardCommentSection(
-          comments: detail.comments,
-          onScrollToCommentInput: onScrollToCommentInput,
-          onPostComment: onPostComment,
-          onEditComment: onEditComment,
-          onDeleteComment: onDeleteComment,
-        ),
-      ],
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Tooltip(
+                    message: detail.liked ? '좋아요 취소' : '좋아요',
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(
+                        side: BorderSide(color: Color(0xFFE8E1DA)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: likeBusy ? null : onLikeTap,
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Center(
+                            child: likeBusy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _boardCaramel,
+                                    ),
+                                  )
+                                : Icon(
+                                    detail.liked
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    size: 20,
+                                    color: detail.liked
+                                        ? const Color(0xFFC94848)
+                                        : const Color(0xFF6F6560),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    '${detail.likeCount}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF5F5652),
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+              Material(
+                color: Colors.white,
+                shape: const StadiumBorder(
+                  side: BorderSide(color: Color(0xFFE8E1DA)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onScrollToCommentInput,
+                  borderRadius: BorderRadius.circular(99),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 18,
+                          color: Color(0xFF6F6560),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '댓글 ${detail.comments.length}',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: const Color(0xFF5F5652),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Divider(height: 1, color: Color(0xFFE8E1DA)),
+          const SizedBox(height: 20),
+          _BoardCommentSection(
+            comments: detail.comments,
+            onScrollToCommentInput: onScrollToCommentInput,
+            onPostComment: onPostComment,
+            onEditComment: onEditComment,
+            onDeleteComment: onDeleteComment,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -944,14 +1101,14 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                color: const Color(0xFFF2E7DC),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '${widget.comments.length}',
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
+                  color: _boardEspresso,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -961,7 +1118,7 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
         if (_replyingTo != null) ...[
           const SizedBox(height: 10),
           Material(
-            color: cs.primaryContainer.withValues(alpha: 0.35),
+            color: const Color(0xFFF7F2EC),
             borderRadius: BorderRadius.circular(10),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -971,7 +1128,7 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
                     child: Text(
                       '${_replyingTo!.nickname.isEmpty ? '작성자' : _replyingTo!.nickname}님에게 답글',
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: cs.onPrimaryContainer,
+                        color: _boardEspresso,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -998,17 +1155,17 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 28),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.22),
+              color: const Color(0xFFF7F6F4),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: cs.outline.withValues(alpha: 0.12),
+                color: const Color(0xFFE8E1DA),
               ),
             ),
             alignment: Alignment.center,
             child: Text(
               '아직 댓글이 없습니다.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
+                color: _boardMuted,
               ),
             ),
           )
@@ -1043,7 +1200,7 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
           }),
         const SizedBox(height: 16),
         Material(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+          color: const Color(0xFFF7F2EC),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
@@ -1084,9 +1241,13 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                    : IconButton.filledTonal(
+                    : IconButton.filled(
                         onPressed: _submit,
                         tooltip: '등록',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFF35424A),
+                          foregroundColor: Colors.white,
+                        ),
                         icon: const Icon(Icons.send_rounded, size: 22),
                       ),
               ],
@@ -1136,14 +1297,14 @@ class _BoardCommentTile extends StatelessWidget {
               margin: const EdgeInsets.only(right: 10, top: 6),
               constraints: const BoxConstraints(minHeight: 36),
               decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.35),
+                color: _boardCaramel.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           CircleAvatar(
             radius: isReply ? 14 : 18,
-            backgroundColor: cs.primaryContainer,
-            foregroundColor: cs.onPrimaryContainer,
+            backgroundColor: const Color(0xFFF2E7DC),
+            foregroundColor: _boardEspresso,
             child: Text(
               initial,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -1204,14 +1365,14 @@ class _BoardCommentTile extends StatelessWidget {
                               Icon(
                                 Icons.reply_outlined,
                                 size: 16,
-                                color: cs.primary,
+                                color: _boardCaramel,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 '답글',
                                 style:
                                     theme.textTheme.labelSmall?.copyWith(
-                                  color: cs.primary,
+                                  color: _boardCaramel,
                                 ),
                               ),
                             ],

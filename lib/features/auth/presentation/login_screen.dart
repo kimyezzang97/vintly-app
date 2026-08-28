@@ -217,6 +217,7 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F3F1),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

@@ -106,9 +106,7 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('회원가입'),
-      ),
+      backgroundColor: const Color(0xFFF4F3F1),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

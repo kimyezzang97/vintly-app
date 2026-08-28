@@ -7,8 +7,8 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart';
 
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
@@ -26,12 +26,17 @@ class VintageListScreen extends StatefulWidget {
 }
 
 class _VintageListScreenState extends State<VintageListScreen> {
+  static const Color _ink = Color(0xFF241A17);
+  static const Color _espresso = Color(0xFF3B241C);
+  static const Color _caramel = Color(0xFFA96F3D);
+  static const Color _cream = Color(0xFFF5F0E8);
   bool _loading = true;
   String? _errorMessage;
   bool _needReLogin = false;
   List<VintageShop> _shops = [];
-  final MapController _mapController = MapController();
-  static const LatLng _defaultCenter = LatLng(37.5665, 126.9780);
+  NaverMapController? _mapController;
+  NOverlayImage? _shopMarkerIcon;
+  static const NLatLng _defaultCenter = NLatLng(37.5665, 126.9780);
   static const double _defaultZoom = 12.0;
   static const String _vintagesPath = '/api/v1/vintages';
 
@@ -42,6 +47,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
   }
 
   Future<void> _loadShops() async {
+    _mapController = null;
     setState(() {
       _loading = true;
       _errorMessage = null;
@@ -72,10 +78,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return;
       }
 
@@ -83,10 +88,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return;
       }
 
@@ -115,6 +119,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
         _loading = false;
         _shops = shops;
       });
+      await _renderShopsOnMap();
     } catch (e, st) {
       debugPrint('[VintageList] _loadShops error: $e');
       debugPrint('[VintageList] stack: $st');
@@ -126,21 +131,82 @@ class _VintageListScreenState extends State<VintageListScreen> {
     }
   }
 
+  Future<void> _renderShopsOnMap() async {
+    final controller = _mapController;
+    if (controller == null) return;
+
+    await controller.clearOverlays(type: NOverlayType.marker);
+    if (!mounted || controller != _mapController) return;
+
+    final markerIcon = _shopMarkerIcon ??= await NOverlayImage.fromWidget(
+      widget: const _VintageMapMarker(),
+      size: const Size(40, 50),
+      context: context,
+    );
+    if (!mounted || controller != _mapController) return;
+
+    final markers = _shops.map((shop) {
+      final marker = NMarker(
+        id: 'vintage_${shop.vintageId}',
+        position: NLatLng(shop.lat, shop.lon),
+        icon: markerIcon,
+        size: const Size(40, 50),
+        caption: NOverlayCaption(
+          text: shop.name,
+          color: const Color(0xFF34383D),
+          haloColor: Colors.white,
+        ),
+        captionOffset: 2,
+      );
+      marker.setOnTapListener((_) => _onMarkerTap(shop));
+      return marker;
+    }).toSet();
+    if (markers.isNotEmpty) await controller.addOverlayAll(markers);
+
+    if (_shops.length == 1) {
+      await controller.updateCamera(
+        NCameraUpdate.scrollAndZoomTo(
+          target: NLatLng(_shops.first.lat, _shops.first.lon),
+          zoom: 15,
+        ),
+      );
+    } else if (_shops.length > 1) {
+      final bounds = NLatLngBounds.from(
+        _shops.map((shop) => NLatLng(shop.lat, shop.lon)),
+      );
+      await controller.updateCamera(
+        NCameraUpdate.fitBounds(
+          bounds,
+          padding: const EdgeInsets.fromLTRB(48, 96, 48, 96),
+        ),
+      );
+    }
+  }
+
   /// 상세 API 호출: GET /api/v1/vintages/{id} (401 시 reissue 후 재시도).
   /// 401/403이면 needReLogin true로 반환 → 로그인 화면으로 이동.
-  Future<({VintageShopDetail? detail, bool needReLogin})> _fetchShopDetail(int vintageId) async {
+  Future<({VintageShopDetail? detail, bool needReLogin})> _fetchShopDetail(
+    int vintageId,
+  ) async {
     final baseUrl = AppConfig.instance.backend.baseUrl;
-    final response = await getJsonWithAuth(baseUrl, '/api/v1/vintages/$vintageId');
+    final response = await getJsonWithAuth(
+      baseUrl,
+      '/api/v1/vintages/$vintageId',
+    );
 
     final code = response.code ?? response.statusCode;
-    if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+    if (response.statusCode == 401 ||
+        code == 401 ||
+        response.statusCode == 403) {
       return (detail: null, needReLogin: true);
     }
     if (response.statusCode != 200 || code != 200) {
       return (detail: null, needReLogin: false);
     }
     final data = response.json['data'];
-    if (data is! Map<String, dynamic>) return (detail: null, needReLogin: false);
+    if (data is! Map<String, dynamic>) {
+      return (detail: null, needReLogin: false);
+    }
     try {
       return (detail: VintageShopDetail.fromJson(data), needReLogin: false);
     } catch (_) {
@@ -160,13 +226,8 @@ class _VintageListScreenState extends State<VintageListScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const ModalBarrier(
-                color: Colors.transparent,
-                dismissible: false,
-              ),
-              const Center(
-                child: CircularProgressIndicator(),
-              ),
+              const ModalBarrier(color: Colors.transparent, dismissible: false),
+              const Center(child: CircularProgressIndicator()),
             ],
           ),
         ),
@@ -182,16 +243,15 @@ class _VintageListScreenState extends State<VintageListScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return;
       }
       if (result.detail == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('상세 정보를 불러오지 못했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('상세 정보를 불러오지 못했습니다.')));
         return;
       }
 
@@ -217,7 +277,6 @@ class _VintageListScreenState extends State<VintageListScreen> {
     Map<String, String>? imageRequestHeaders,
   }) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     bool liked = detail.liked;
     int likeCount = detail.likeCount;
     bool likeLoading = false;
@@ -240,13 +299,13 @@ class _VintageListScreenState extends State<VintageListScreen> {
         expand: false,
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, -4),
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 24,
+                offset: const Offset(0, -6),
               ),
             ],
           ),
@@ -258,218 +317,260 @@ class _VintageListScreenState extends State<VintageListScreen> {
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOut,
                 padding: EdgeInsets.only(bottom: bottomInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 고정: 핸들 + 이미지 + 주소 (키보드 올라왔을 때는 숨겨서 댓글/입력창 영역 확보)
-                    if (!isKeyboardVisible)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: cs.outline.withValues(alpha: 0.4),
-                                  borderRadius: BorderRadius.circular(2),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD8CEC6),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // 키보드가 올라오면 이미지와 주소를 숨겨 입력 영역 확보
+                      if (!isKeyboardVisible)
+                        Padding(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (detail.imgList.isNotEmpty) ...[
+                                _VintageDetailImageCarousel(
+                                  imgList: detail.imgList,
+                                  baseUrl: AppConfig.instance.backend.baseUrl,
+                                  imageRequestHeaders: imageRequestHeaders,
+                                  imagePlaceholder: _imagePlaceholder(),
+                                  shopName: detail.name,
+                                  likeCount: likeCount,
+                                  liked: liked,
+                                  likeLoading: likeLoading,
+                                  onToggleLike: () async {
+                                    if (likeLoading) return;
+                                    setStateSB(() => likeLoading = true);
+                                    final result = await _toggleLike(
+                                      vintageId: detail.vintageId,
+                                      currentLiked: liked,
+                                    );
+                                    if (!context.mounted) return;
+                                    setStateSB(() {
+                                      likeLoading = false;
+                                      if (result != null) {
+                                        liked = result.$1;
+                                        likeCount = result.$2;
+                                      }
+                                    });
+                                  },
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            if (detail.imgList.isNotEmpty) ...[
-                              _VintageDetailImageCarousel(
-                                imgList: detail.imgList,
-                                baseUrl: AppConfig.instance.backend.baseUrl,
-                                imageRequestHeaders: imageRequestHeaders,
-                                imagePlaceholder: _imagePlaceholder(),
-                                shopName: detail.name,
-                                likeCount: likeCount,
-                                liked: liked,
-                                likeLoading: likeLoading,
-                                onToggleLike: () async {
-                                  if (likeLoading) return;
-                                  setStateSB(() => likeLoading = true);
-                                  final result = await _toggleLike(
-                                    vintageId: detail.vintageId,
-                                    currentLiked: liked,
-                                  );
-                                  if (!context.mounted) return;
-                                  setStateSB(() {
-                                    likeLoading = false;
-                                    if (result != null) {
-                                      liked = result.$1;
-                                      likeCount = result.$2;
-                                    }
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 20),
-                            ] else ...[
-                              _imagePlaceholder(),
-                              const SizedBox(height: 20),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: cs.primaryContainer.withValues(alpha: 0.4),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: cs.primary.withValues(alpha: 0.3), width: 1),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        detail.name,
-                                        style: theme.textTheme.headlineSmall?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: cs.onSurface,
+                                const SizedBox(height: 20),
+                              ] else ...[
+                                _imagePlaceholder(),
+                                const SizedBox(height: 20),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF7F2EC),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFE8DDD3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          detail.name,
+                                          style: theme.textTheme.headlineSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: _espresso,
+                                              ),
                                         ),
                                       ),
-                                    ),
-                                    if (likeLoading)
-                                      const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    else
-                                      Icon(
-                                        liked ? Icons.favorite : Icons.favorite_border,
-                                        color: liked ? Colors.red.shade600 : cs.outline,
-                                        size: 20,
+                                      if (likeLoading)
+                                        const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      else
+                                        Icon(
+                                          liked
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          color: liked
+                                              ? Colors.red.shade600
+                                              : const Color(0xFF8A817D),
+                                          size: 20,
+                                        ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$likeCount',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: _espresso,
+                                            ),
                                       ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '$likeCount',
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurfaceVariant,
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                              ],
+                              // 주소
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF7F2EC),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0xFFE8DDD3),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on_outlined,
+                                      size: 20,
+                                      color: _espresso,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        detail.address,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: const Color(0xFF5F5652),
+                                              height: 1.35,
+                                            ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 20),
                             ],
-                            // 주소
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: cs.secondaryContainer.withValues(alpha: 0.35),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(Icons.location_on_outlined, size: 20, color: cs.secondary),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      detail.address,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: cs.onSurfaceVariant,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
+                          ),
                         ),
-                      ),
-                    // 스크롤: 댓글만
-                    Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                    child: _CommentSection(
-                      detail: updatedDetail ?? detail,
-                      replyingTo: replyingTo,
-                      commentController: commentController,
-                      commentFocusNode: commentFocusNode,
-                      onReplyTap: (c) {
-                        setStateSB(() => replyingTo = c);
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          commentFocusNode.requestFocus();
-                        });
-                      },
-                      onCancelReply: () => setStateSB(() => replyingTo = null),
-                      onCommentSubmitted: () async {
-                        final text = commentController.text.trim();
-                        if (text.isEmpty) return;
-                        final d = updatedDetail ?? detail;
-                        final success = await _postComment(
-                          vintageId: d.vintageId,
-                          parentCommentId: replyingTo?.commentId ?? 0,
-                          comment: text,
-                        );
-                        if (!context.mounted) return;
-                        if (success) {
-                          commentController.clear();
-                          setStateSB(() => replyingTo = null);
-                          final result = await _fetchShopDetail(d.vintageId);
-                          if (context.mounted && result.detail != null) {
-                            setStateSB(() => updatedDetail = result.detail);
+                      _CommentSection(
+                        detail: updatedDetail ?? detail,
+                        replyingTo: replyingTo,
+                        commentController: commentController,
+                        commentFocusNode: commentFocusNode,
+                        onReplyTap: (c) {
+                          setStateSB(() => replyingTo = c);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            commentFocusNode.requestFocus();
+                          });
+                        },
+                        onCancelReply: () =>
+                            setStateSB(() => replyingTo = null),
+                        onCommentSubmitted: () async {
+                          final text = commentController.text.trim();
+                          if (text.isEmpty) return;
+                          final d = updatedDetail ?? detail;
+                          final success = await _postComment(
+                            vintageId: d.vintageId,
+                            parentCommentId: replyingTo?.commentId ?? 0,
+                            comment: text,
+                          );
+                          if (!context.mounted) return;
+                          if (success) {
+                            commentController.clear();
+                            setStateSB(() => replyingTo = null);
+                            final result = await _fetchShopDetail(d.vintageId);
+                            if (context.mounted && result.detail != null) {
+                              setStateSB(() => updatedDetail = result.detail);
+                            }
                           }
-                        }
-                      },
-                      commentTileBuilder: (c, {required bool isReply}) {
-                        final d = updatedDetail ?? detail;
-                        return _commentTile(
-                          context,
-                          c,
-                          isReply: isReply,
-                          onReply: c.parentCommentId == 0
-                              ? () {
-                                  setStateSB(() => replyingTo = c);
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    commentFocusNode.requestFocus();
-                                  });
+                        },
+                        commentTileBuilder: (c, {required bool isReply}) {
+                          final d = updatedDetail ?? detail;
+                          return _commentTile(
+                            context,
+                            c,
+                            isReply: isReply,
+                            onReply: c.parentCommentId == 0
+                                ? () {
+                                    setStateSB(() => replyingTo = c);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          commentFocusNode.requestFocus();
+                                        });
+                                  }
+                                : null,
+                            currentMemberId: CurrentUserHolder.memberId,
+                            onEdit: () async {
+                              final newContent = await _showEditCommentDialog(
+                                context,
+                                c.content,
+                              );
+                              if (newContent == null ||
+                                  newContent.isEmpty ||
+                                  !context.mounted) {
+                                return;
+                              }
+                              final success = await _putComment(
+                                vintageId: d.vintageId,
+                                commentId: c.commentId,
+                                comment: newContent,
+                              );
+                              if (!context.mounted) return;
+                              if (success) {
+                                final result = await _fetchShopDetail(
+                                  d.vintageId,
+                                );
+                                if (context.mounted && result.detail != null) {
+                                  setStateSB(
+                                    () => updatedDetail = result.detail,
+                                  );
                                 }
-                              : null,
-                          currentMemberId: CurrentUserHolder.memberId,
-                          onEdit: () async {
-                            final newContent = await _showEditCommentDialog(context, c.content);
-                            if (newContent == null || newContent.isEmpty || !context.mounted) return;
-                            final success = await _putComment(
-                              vintageId: d.vintageId,
-                              commentId: c.commentId,
-                              comment: newContent,
-                            );
-                            if (!context.mounted) return;
-                            if (success) {
-                              final result = await _fetchShopDetail(d.vintageId);
-                              if (context.mounted && result.detail != null) {
-                                setStateSB(() => updatedDetail = result.detail);
                               }
-                            }
-                          },
-                          onDelete: () async {
-                            final confirm = await _showDeleteCommentConfirmDialog(context);
-                            if (confirm != true || !context.mounted) return;
-                            final success = await _deleteComment(
-                              vintageId: d.vintageId,
-                              commentId: c.commentId,
-                            );
-                            if (!context.mounted) return;
-                            if (success) {
-                              final result = await _fetchShopDetail(d.vintageId);
-                              if (context.mounted && result.detail != null) {
-                                setStateSB(() => updatedDetail = result.detail);
+                            },
+                            onDelete: () async {
+                              final confirm =
+                                  await _showDeleteCommentConfirmDialog(
+                                    context,
+                                  );
+                              if (confirm != true || !context.mounted) return;
+                              final success = await _deleteComment(
+                                vintageId: d.vintageId,
+                                commentId: c.commentId,
+                              );
+                              if (!context.mounted) return;
+                              if (success) {
+                                final result = await _fetchShopDetail(
+                                  d.vintageId,
+                                );
+                                if (context.mounted && result.detail != null) {
+                                  setStateSB(
+                                    () => updatedDetail = result.detail,
+                                  );
+                                }
                               }
-                            }
-                          },
-                        );
-                      },
-                    ),
+                            },
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                    ),
-                  ],
                 ),
               );
             },
@@ -499,14 +600,15 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       final code = response.code ?? response.statusCode;
 
-      if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+      if (response.statusCode == 401 ||
+          code == 401 ||
+          response.statusCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return null;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return null;
       }
 
@@ -516,9 +618,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
       if (!success || data is! Map<String, dynamic>) {
         final msg = response.msg ?? '좋아요 처리에 실패했습니다.';
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(msg)));
         }
         return null;
       }
@@ -537,9 +639,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
       return (newLiked, newLikeCount);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('좋아요 처리 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('좋아요 처리 중 오류: $e')));
       }
       return null;
     }
@@ -548,12 +650,16 @@ class _VintageListScreenState extends State<VintageListScreen> {
   Widget _imagePlaceholder() {
     return Container(
       height: 280,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(16),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF2EAE2),
+        borderRadius: BorderRadius.all(Radius.circular(20)),
       ),
       child: const Center(
-        child: Icon(Icons.store, size: 72, color: Colors.grey),
+        child: Icon(
+          Icons.storefront_rounded,
+          size: 64,
+          color: Color(0xFF8B6A59),
+        ),
       ),
     );
   }
@@ -572,17 +678,14 @@ class _VintageListScreenState extends State<VintageListScreen> {
     final initial = c.nickname.isNotEmpty ? c.nickname[0].toUpperCase() : '?';
     final isMine = currentMemberId != null && c.memberId == currentMemberId;
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: 14,
-        left: isReply ? 40 : 0,
-      ),
+      padding: EdgeInsets.only(bottom: 14, left: isReply ? 40 : 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: isReply ? 14 : 18,
-            backgroundColor: cs.primaryContainer,
-            foregroundColor: cs.onPrimaryContainer,
+            backgroundColor: const Color(0xFFF2E7DC),
+            foregroundColor: const Color(0xFF4E342E),
             child: Text(
               initial,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -630,7 +733,10 @@ class _VintageListScreenState extends State<VintageListScreen> {
                         behavior: HitTestBehavior.opaque,
                         onTap: onReply,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -658,7 +764,10 @@ class _VintageListScreenState extends State<VintageListScreen> {
                           behavior: HitTestBehavior.opaque,
                           onTap: () => onEdit(),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 6,
+                            ),
                             child: Text(
                               '수정',
                               style: theme.textTheme.labelSmall?.copyWith(
@@ -700,7 +809,10 @@ class _VintageListScreenState extends State<VintageListScreen> {
     );
   }
 
-  Future<String?> _showEditCommentDialog(BuildContext context, String initialContent) async {
+  Future<String?> _showEditCommentDialog(
+    BuildContext context,
+    String initialContent,
+  ) async {
     final controller = TextEditingController(text: initialContent);
     final result = await showDialog<String>(
       context: context,
@@ -766,7 +878,9 @@ class _VintageListScreenState extends State<VintageListScreen> {
   String _formatDate(String iso) {
     try {
       final dt = DateTime.tryParse(iso);
-      if (dt != null) return '${dt.year}.${dt.month}.${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      if (dt != null) {
+        return '${dt.year}.${dt.month}.${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      }
     } catch (_) {}
     return iso;
   }
@@ -793,14 +907,15 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       final code = response.code ?? response.statusCode;
 
-      if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+      if (response.statusCode == 401 ||
+          code == 401 ||
+          response.statusCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return false;
       }
 
@@ -808,21 +923,23 @@ class _VintageListScreenState extends State<VintageListScreen> {
       if (!success) {
         final msg = response.msg ?? '댓글 등록에 실패했습니다.';
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(msg)));
         }
         return false;
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글이 등록되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('댓글이 등록되었습니다.')));
       }
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 등록 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 등록 중 오류: $e')));
       }
       return false;
     }
@@ -841,22 +958,20 @@ class _VintageListScreenState extends State<VintageListScreen> {
       final response = await putJsonWithAuth(
         baseUrl,
         path,
-        body: {
-          'commentId': commentId,
-          'comment': comment,
-        },
+        body: {'commentId': commentId, 'comment': comment},
       );
 
       final code = response.code ?? response.statusCode;
 
-      if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+      if (response.statusCode == 401 ||
+          code == 401 ||
+          response.statusCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return false;
       }
 
@@ -864,21 +979,23 @@ class _VintageListScreenState extends State<VintageListScreen> {
       if (!success) {
         final msg = response.msg ?? '댓글 수정에 실패했습니다.';
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(msg)));
         }
         return false;
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글이 수정되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('댓글이 수정되었습니다.')));
       }
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 수정 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 수정 중 오류: $e')));
       }
       return false;
     }
@@ -897,14 +1014,15 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       final code = response.code ?? response.statusCode;
 
-      if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+      if (response.statusCode == 401 ||
+          code == 401 ||
+          response.statusCode == 403) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return false;
       }
 
@@ -912,21 +1030,23 @@ class _VintageListScreenState extends State<VintageListScreen> {
       if (!success) {
         final msg = response.msg ?? '댓글 삭제에 실패했습니다.';
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(msg)));
         }
         return false;
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글이 삭제되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('댓글이 삭제되었습니다.')));
       }
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 삭제 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 삭제 중 오류: $e')));
       }
       return false;
     }
@@ -935,21 +1055,76 @@ class _VintageListScreenState extends State<VintageListScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Vintage Shops'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: cs.outline.withValues(alpha: 0.2),
-          ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: _cream,
+        body: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: Colors.white,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 18,
+                20,
+                18,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'VINTLY',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: _caramel,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 2.4,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '빈티지 샵',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: _espresso,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2E7DC),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      '${_shops.length}곳',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: _espresso,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _buildBody()),
+          ],
         ),
       ),
-      body: _buildBody(),
     );
   }
 
@@ -991,10 +1166,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
                   child: const Text('다시 로그인'),
                 )
               else
-                FilledButton(
-                  onPressed: _loadShops,
-                  child: const Text('다시 시도'),
-                ),
+                FilledButton(onPressed: _loadShops, child: const Text('다시 시도')),
             ],
           ),
         ),
@@ -1005,89 +1177,77 @@ class _VintageListScreenState extends State<VintageListScreen> {
       return const Center(child: Text('등록된 빈티지 샵이 없습니다.'));
     }
 
-    const double minZoom = 3.0;
-    const double maxZoom = 18.0;
-
-    final markers = _shops.map((shop) {
-      return Marker(
-        point: LatLng(shop.lat, shop.lon),
-        width: 48,
-        height: 48,
-        child: GestureDetector(
-          onTap: () => _onMarkerTap(shop),
-          child: const _VintageShopMarkerIcon(),
-        ),
-      );
-    }).toList();
-
     return Stack(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _defaultCenter,
-              initialZoom: _defaultZoom,
-              minZoom: minZoom,
-              maxZoom: maxZoom,
-              onMapReady: () {
-                if (_shops.isEmpty) return;
-                final points = _shops.map((s) => LatLng(s.lat, s.lon)).toList();
-                _mapController.fitCamera(
-                  CameraFit.bounds(
-                    bounds: LatLngBounds.fromPoints(points),
-                    padding: const EdgeInsets.all(48),
-                  ),
-                );
-                // 초기 진입 시 회색 화면 방지를 위해, 눈에 띄지 않을 정도로 카메라를 한 번 살짝 움직여 준다.
-                Future.delayed(const Duration(milliseconds: 300), () {
-                  final camera = _mapController.camera;
-                  // 위도로 아주 조금만 이동 (사용자는 거의 못 느끼는 수준)
-                  final nudgedCenter = LatLng(
-                    camera.center.latitude + 0.0005,
-                    camera.center.longitude,
-                  );
-                  _mapController.move(nudgedCenter, camera.zoom);
-                });
-              },
+        NaverMap(
+          options: const NaverMapViewOptions(
+            initialCameraPosition: NCameraPosition(
+              target: _defaultCenter,
+              zoom: _defaultZoom,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png',
-                userAgentPackageName: 'dev.vintly.app',
-              ),
-              MarkerLayer(markers: markers),
-            ],
           ),
+          onMapReady: (controller) async {
+            _mapController = controller;
+            await _renderShopsOnMap();
+          },
         ),
         Positioned(
           left: 16,
-          bottom: 24,
+          top: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _ink.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.touch_app_rounded,
+                  size: 18,
+                  color: Color(0xFFD8B384),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  '마커를 눌러 샵을 둘러보세요',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: 20,
           child: Material(
-            elevation: 2,
-            borderRadius: BorderRadius.circular(16),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
+            elevation: 5,
+            borderRadius: BorderRadius.circular(14),
+            color: _ink,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  onPressed: () {
-                    final camera = _mapController.camera;
-                    final next = (camera.zoom + 1).clamp(minZoom, maxZoom);
-                    _mapController.move(camera.center, next);
-                  },
-                  icon: const Icon(Icons.add),
+                  onPressed: () =>
+                      _mapController?.updateCamera(NCameraUpdate.zoomIn()),
+                  icon: const Icon(Icons.add, color: Colors.white),
                   tooltip: '확대',
                 ),
-                Divider(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                const Divider(height: 1, color: Color(0xFF5B4A43)),
                 IconButton(
-                  onPressed: () {
-                    final camera = _mapController.camera;
-                    final next = (camera.zoom - 1).clamp(minZoom, maxZoom);
-                    _mapController.move(camera.center, next);
-                  },
-                  icon: const Icon(Icons.remove),
+                  onPressed: () =>
+                      _mapController?.updateCamera(NCameraUpdate.zoomOut()),
+                  icon: const Icon(Icons.remove, color: Colors.white),
                   tooltip: '축소',
                 ),
               ],
@@ -1095,22 +1255,103 @@ class _VintageListScreenState extends State<VintageListScreen> {
           ),
         ),
         Positioned(
-          top: MediaQuery.of(context).padding.top + 8,
-          right: 8,
+          left: 16,
+          bottom: 20,
           child: Material(
-            elevation: 2,
-            borderRadius: BorderRadius.circular(16),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
-            child: IconButton(
-              onPressed: _loading ? null : _loadShops,
-              icon: const Icon(Icons.refresh),
-              tooltip: '새로고침',
+            elevation: 5,
+            color: _espresso,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: _loading ? null : _loadShops,
+              borderRadius: BorderRadius.circular(14),
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Icon(
+                  Icons.refresh_rounded,
+                  size: 22,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ),
       ],
     );
   }
+}
+
+class _VintageMapMarker extends StatelessWidget {
+  const _VintageMapMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 40,
+      height: 50,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          CustomPaint(size: Size(40, 50), painter: _VintageMarkerPainter()),
+          Positioned(
+            top: 9,
+            child: Icon(Icons.checkroom_rounded, size: 21, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VintageMarkerPainter extends CustomPainter {
+  const _VintageMarkerPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const horizontalInset = 4.0;
+    const topInset = 4.0;
+    const bottomInset = 4.0;
+    final radius = (size.width - horizontalInset * 2) / 2;
+    final circleCenterY = topInset + radius;
+    final tipY = size.height - bottomInset;
+
+    final path = Path()
+      ..moveTo(size.width / 2, tipY)
+      ..cubicTo(
+        size.width * 0.42,
+        size.height * 0.76,
+        horizontalInset,
+        size.height * 0.58,
+        horizontalInset,
+        circleCenterY,
+      )
+      ..arcToPoint(
+        Offset(size.width - horizontalInset, circleCenterY),
+        radius: Radius.circular(radius),
+        largeArc: true,
+      )
+      ..cubicTo(
+        size.width - horizontalInset,
+        size.height * 0.58,
+        size.width * 0.58,
+        size.height * 0.76,
+        size.width / 2,
+        tipY,
+      )
+      ..close();
+
+    canvas.drawShadow(path, Colors.black, 3, false);
+    canvas.drawPath(path, Paint()..color = const Color(0xFF35424A));
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFFE7ECEF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// 댓글 제목 + 트리(일반/대댓글) + 입력 필드
@@ -1133,7 +1374,8 @@ class _CommentSection extends StatelessWidget {
   final void Function(VintageComment c) onReplyTap;
   final VoidCallback onCancelReply;
   final VoidCallback onCommentSubmitted;
-  final Widget Function(VintageComment c, {required bool isReply}) commentTileBuilder;
+  final Widget Function(VintageComment c, {required bool isReply})
+  commentTileBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -1172,12 +1414,13 @@ class _CommentSection extends StatelessWidget {
           )
         else
           ...topLevel.expand((t) {
-            final replies = comments.where((c) => c.parentCommentId == t.commentId).toList()
-              ..sort((a, b) => a.createdAt.compareTo(b.createdAt)); // 오래된 순(위로)
+            final replies =
+                comments.where((c) => c.parentCommentId == t.commentId).toList()
+                  ..sort(
+                    (a, b) => a.createdAt.compareTo(b.createdAt),
+                  ); // 오래된 순(위로)
 
-            final children = <Widget>[
-              commentTileBuilder(t, isReply: false),
-            ];
+            final children = <Widget>[commentTileBuilder(t, isReply: false)];
 
             // YouTube 스타일: 선택된 댓글 바로 아래에 답글 입력창 표시
             if (replyingTo != null && replyingTo!.commentId == t.commentId) {
@@ -1196,7 +1439,10 @@ class _CommentSection extends StatelessWidget {
                           hintText: '답글을 입력하세요',
                           border: OutlineInputBorder(),
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                         ),
                         onSubmitted: (_) => onCommentSubmitted(),
                       ),
@@ -1216,7 +1462,9 @@ class _CommentSection extends StatelessWidget {
                       onPressed: onCancelReply,
                       child: Text(
                         '취소',
-                        style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.outline,
+                        ),
                       ),
                     ),
                   ],
@@ -1225,7 +1473,9 @@ class _CommentSection extends StatelessWidget {
               children.add(const SizedBox(height: 8));
             }
 
-            children.addAll(replies.map((r) => commentTileBuilder(r, isReply: true)));
+            children.addAll(
+              replies.map((r) => commentTileBuilder(r, isReply: true)),
+            );
             return children;
           }),
         const SizedBox(height: 16),
@@ -1243,7 +1493,10 @@ class _CommentSection extends StatelessWidget {
                     hintText: '댓글을 입력하세요',
                     border: OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                   onSubmitted: (_) => onCommentSubmitted(),
                 ),
@@ -1256,44 +1509,6 @@ class _CommentSection extends StatelessWidget {
             ],
           ),
       ],
-    );
-  }
-}
-
-class _VintageShopMarkerIcon extends StatelessWidget {
-  const _VintageShopMarkerIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(Colors.brown.shade400, Colors.amber.shade100, 0.2)!,
-            Colors.brown.shade500,
-          ],
-        ),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.brown.shade900.withValues(alpha: 0.25),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.4),
-            blurRadius: 2,
-            offset: const Offset(0, -1),
-          ),
-        ],
-      ),
-      child: const Padding(
-        padding: EdgeInsets.all(6),
-        child: Icon(Icons.store_rounded, color: Colors.white, size: 26),
-      ),
     );
   }
 }
@@ -1314,6 +1529,7 @@ class _VintageDetailImageCarousel extends StatefulWidget {
 
   final List<VintageImage> imgList;
   final String baseUrl;
+
   /// API 이미지가 access 헤더를 요구할 때 전달 (Image.network 에 그대로 사용)
   final Map<String, String>? imageRequestHeaders;
   final Widget imagePlaceholder;
@@ -1324,10 +1540,12 @@ class _VintageDetailImageCarousel extends StatefulWidget {
   final VoidCallback? onToggleLike;
 
   @override
-  State<_VintageDetailImageCarousel> createState() => _VintageDetailImageCarouselState();
+  State<_VintageDetailImageCarousel> createState() =>
+      _VintageDetailImageCarouselState();
 }
 
-class _VintageDetailImageCarouselState extends State<_VintageDetailImageCarousel> {
+class _VintageDetailImageCarouselState
+    extends State<_VintageDetailImageCarousel> {
   late final PageController _pageController;
   int _currentPage = 0;
 
@@ -1400,14 +1618,15 @@ class _VintageDetailImageCarouselState extends State<_VintageDetailImageCarousel
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(20),
                       child: url.isEmpty
                           ? widget.imagePlaceholder
                           : Image.network(
                               url,
                               fit: BoxFit.cover,
                               headers: _headersForResolvedUrl(url),
-                              errorBuilder: (_, __, ___) => widget.imagePlaceholder,
+                              errorBuilder: (_, _, _) =>
+                                  widget.imagePlaceholder,
                             ),
                     ),
                   );
@@ -1425,8 +1644,16 @@ class _VintageDetailImageCarouselState extends State<_VintageDetailImageCarousel
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     shadows: [
-                      Shadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 8, offset: const Offset(0, 1)),
-                      Shadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 2)),
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        blurRadius: 8,
+                        offset: const Offset(0, 1),
+                      ),
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
                   maxLines: 2,
@@ -1459,7 +1686,9 @@ class _VintageDetailImageCarouselState extends State<_VintageDetailImageCarousel
                 height: 7,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isActive ? cs.primary : cs.outline.withValues(alpha: 0.5),
+                  color: isActive
+                      ? cs.primary
+                      : cs.outline.withValues(alpha: 0.5),
                 ),
               );
             }),
@@ -1488,9 +1717,9 @@ class _LikePillOverlay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.35),
+        color: Colors.white.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
+        border: Border.all(color: const Color(0xFFE8E1DA), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2),
@@ -1512,51 +1741,20 @@ class _LikePillOverlay extends StatelessWidget {
               ),
             )
           else
-            _Heart3D(liked: liked),
+            Icon(
+              liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              size: 22,
+              color: liked ? const Color(0xFFC94848) : const Color(0xFF4E342E),
+            ),
           const SizedBox(width: 6),
           Text(
             '$likeCount',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: Colors.white,
-              shadows: [
-                Shadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4, offset: const Offset(0, 1)),
-              ],
+              color: const Color(0xFF4E342E),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 하트 아이콘 — 살짝 3D 느낌 (그림자)
-class _Heart3D extends StatelessWidget {
-  const _Heart3D({required this.liked});
-
-  final bool liked;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.15),
-            blurRadius: 1,
-            offset: const Offset(0, -1),
-          ),
-        ],
-      ),
-      child: Icon(
-        liked ? Icons.favorite : Icons.favorite_border,
-        size: 22,
-        color: liked ? Colors.red.shade400 : Colors.white,
       ),
     );
   }

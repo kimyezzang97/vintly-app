@@ -39,9 +39,8 @@ dependencies:
   # Android는 KeyStore, iOS는 Keychain을 사용합니다.
   flutter_secure_storage: ^9.2.2
 
-  # 지도(OpenStreetMap) 표시. lat/lon 기반 마커용.
-  flutter_map: ^8.2.2
-  latlong2: ^0.9.1
+  # 국내 지명과 도로명이 한글로 표시되는 네이버 지도.
+  flutter_naver_map: ^1.4.4
 
   # 게시판 이미지 첨부(갤러리)
   image_picker: ^1.1.2

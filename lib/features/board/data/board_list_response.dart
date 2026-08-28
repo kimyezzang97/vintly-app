@@ -4,12 +4,14 @@ class BoardListRow {
   const BoardListRow({
     required this.id,
     required this.title,
+    required this.authorNickname,
     required this.viewCount,
     required this.dateLabel,
   });
 
   final int id;
   final String title;
+  final String authorNickname;
   final int viewCount;
   final String dateLabel;
 }
@@ -77,13 +79,28 @@ BoardListRow? _rowFromJson(Map<String, dynamic> m) {
   final dateRaw =
       m['createdAt'] ?? m['createdDate'] ?? m['modifiedAt'] ?? m['date'];
   final dateLabel = _formatDateLabel(dateRaw);
+  final authorNickname = _firstNonEmptyString([
+    m['authorNickname'],
+    m['nickname'],
+    m['memberNickname'],
+    m['writer'],
+  ]);
 
   return BoardListRow(
     id: id,
     title: title,
+    authorNickname: authorNickname,
     viewCount: viewCount,
     dateLabel: dateLabel,
   );
+}
+
+String _firstNonEmptyString(List<dynamic> values) {
+  for (final value in values) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isNotEmpty) return text;
+  }
+  return '';
 }
 
 int? _readInt(dynamic v) {

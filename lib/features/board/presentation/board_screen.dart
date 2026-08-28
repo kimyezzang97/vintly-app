@@ -3,6 +3,7 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/app_config.dart';
 import '../../../app/app_routes.dart';
@@ -23,6 +24,10 @@ class BoardScreen extends StatefulWidget {
 
 class _BoardScreenState extends State<BoardScreen> {
   static const int _pageSize = 12;
+  static const Color _ink = Color(0xFF241A17);
+  static const Color _espresso = Color(0xFF3B241C);
+  static const Color _caramel = Color(0xFFA96F3D);
+  static const Color _background = Color(0xFFF4F3F1);
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -66,7 +71,10 @@ class _BoardScreenState extends State<BoardScreen> {
         : (result.totalCount + _pageSize - 1) ~/ _pageSize;
     if (totalPages > 0 && newPage >= totalPages) {
       newPage = totalPages - 1;
-      final adjusted = await _fetchBoardData(page: newPage, query: _queryTrimmed);
+      final adjusted = await _fetchBoardData(
+        page: newPage,
+        query: _queryTrimmed,
+      );
       if (!mounted) return;
       setState(() {
         _items
@@ -95,10 +103,7 @@ class _BoardScreenState extends State<BoardScreen> {
   }) async {
     try {
       final baseUrl = AppConfig.instance.backend.baseUrl;
-      final qp = <String, String>{
-        'page': '$page',
-        'size': '$_pageSize',
-      };
+      final qp = <String, String>{'page': '$page', 'size': '$_pageSize'};
       if (query.isNotEmpty) qp['keyword'] = query;
 
       final response = await getJsonWithAuth(
@@ -115,10 +120,9 @@ class _BoardScreenState extends State<BoardScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            AppRoutes.login,
-            (route) => false,
-          );
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         }
         return (items: <_BoardListItem>[], totalCount: 0);
       }
@@ -148,6 +152,7 @@ class _BoardScreenState extends State<BoardScreen> {
             (r) => _BoardListItem(
               id: r.id,
               title: r.title,
+              authorNickname: r.authorNickname,
               viewCount: r.viewCount,
               dateLabel: r.dateLabel,
             ),
@@ -157,9 +162,9 @@ class _BoardScreenState extends State<BoardScreen> {
       return (items: items, totalCount: parsed.totalCount);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('네트워크 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('네트워크 오류: $e')));
       }
       return (items: <_BoardListItem>[], totalCount: 0);
     }
@@ -178,10 +183,11 @@ class _BoardScreenState extends State<BoardScreen> {
     if (deleted == true && mounted) _loadPage(_currentPage);
   }
 
-  int get _listItemCount {
-    if (_loading && _items.isEmpty) return 0;
-    if (_items.isEmpty && !_loading) return 1;
-    return 1 + _items.length;
+  Future<void> _openCreateBoard() async {
+    final created = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const BoardCreateScreen()));
+    if (created == true && mounted) await _loadPage(0);
   }
 
   /// 화면에 보일 페이지 번호 (0-based). 전체가 많으면 현재 주변만.
@@ -197,205 +203,252 @@ class _BoardScreenState extends State<BoardScreen> {
     return List<int>.generate(maxVisible, (i) => start + i);
   }
 
+  Widget _buildPagination() {
+    final pages = _visiblePageIndices();
+    final canGoBack = _currentPage > 0;
+    final canGoForward = _currentPage < _totalPages - 1;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFD8CEC6), width: 1)),
+      ),
+      child: _loading
+          ? const SizedBox(
+              height: 40,
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _caramel,
+                  ),
+                ),
+              ),
+            )
+          : Center(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PagingMiniButton(
+                      label: '‹',
+                      tooltip: '이전',
+                      onPressed: canGoBack
+                          ? () => _loadPage(_currentPage - 1)
+                          : null,
+                    ),
+                    const SizedBox(width: 6),
+                    ...pages.map((index) {
+                      final selected = index == _currentPage;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: _PagingPageButton(
+                          pageLabel: '${index + 1}',
+                          selected: selected,
+                          onPressed: selected ? null : () => _loadPage(index),
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 6),
+                    _PagingMiniButton(
+                      label: '›',
+                      tooltip: '다음',
+                      onPressed: canGoForward
+                          ? () => _loadPage(_currentPage + 1)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final pages = _visiblePageIndices();
-    final canGoBack = !_loading && _currentPage > 0;
-    final canGoForward = !_loading && _currentPage < _totalPages - 1;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Board'),
-        actions: [
-          IconButton(
-            tooltip: '글 작성',
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () async {
-              final created = await Navigator.of(context).push<bool>(
-                MaterialPageRoute(builder: (_) => const BoardCreateScreen()),
-              );
-              if (created == true && mounted) _loadPage(0);
-            },
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: cs.outline.withValues(alpha: 0.2),
-          ),
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SearchBar(
-              controller: _searchController,
-              hintText: '제목·내용 검색',
-              leading: const Icon(Icons.search),
-              trailing: [
-                IconButton(
-                  tooltip: '검색',
-                  onPressed: _loading ? null : () => _onSearchSubmitted(_searchController.text),
-                  icon: const Icon(Icons.arrow_forward),
-                ),
-              ],
-              onSubmitted: _loading ? null : _onSearchSubmitted,
-            ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _onRefresh,
-              child: _loading && _items.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 8),
-                      itemCount: _listItemCount,
-                      itemBuilder: (context, index) {
-                        if (_items.isEmpty && !_loading && index == 0) {
-                          return const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(child: Text('검색 결과가 없습니다.')),
-                          );
-                        }
-                        if (index == 0) {
-                          return _BoardTableHeaderRow(scheme: cs);
-                        }
-                        final item = _items[index - 1];
-                        final rowNumber = _currentPage * _pageSize + index;
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _BoardListTile(
-                              rowNumber: rowNumber,
-                              item: item,
-                              onTap: () => _openBoardDetail(item.id),
-                            ),
-                            Divider(
-                              height: 1,
-                              thickness: 1,
-                              color: cs.outline.withValues(alpha: 0.15),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-          ),
-          ColoredBox(
-            color: theme.scaffoldBackgroundColor,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Divider(
-                  height: 3,
-                  thickness: 2,
-                  color: cs.outline.withValues(alpha: 0.22),
-                ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+      child: Scaffold(
+        backgroundColor: _background,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              color: Colors.white,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 18,
+                14,
+                18,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_totalCount > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Text(
-                              '전체 $_totalCount건',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
+                        Text(
+                          'VINTLY',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: _caramel,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 2.4,
                           ),
-                        if (_loading)
-                          const SizedBox(
-                            height: 40,
-                            child: Center(
-                              child: SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ),
-                          )
-                        else if (_totalPages <= 0)
-                          const SizedBox(
-                            height: 40,
-                            child: Center(child: Text('—')),
-                          )
-                        else
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _PagingMiniButton(
-                                      label: '<<',
-                                      tooltip: '첫 페이지',
-                                      onPressed: canGoBack ? () => _loadPage(0) : null,
-                                      scheme: cs,
-                                      compact: true,
-                                    ),
-                                    _PagingMiniButton(
-                                      label: '<',
-                                      tooltip: '이전',
-                                      onPressed: canGoBack ? () => _loadPage(_currentPage - 1) : null,
-                                      scheme: cs,
-                                      compact: true,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(width: 12),
-                                ...pages.map((index) {
-                                  final n = index + 1;
-                                  final selected = index == _currentPage;
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                                    child: _PagingPageButton(
-                                      pageLabel: '$n',
-                                      selected: selected,
-                                      onPressed: !selected ? () => _loadPage(index) : null,
-                                      scheme: cs,
-                                    ),
-                                  );
-                                }),
-                                const SizedBox(width: 4),
-                                _PagingMiniButton(
-                                  label: '>',
-                                  tooltip: '다음',
-                                  onPressed: canGoForward ? () => _loadPage(_currentPage + 1) : null,
-                                  scheme: cs,
-                                ),
-                                _PagingMiniButton(
-                                  label: '>>',
-                                  tooltip: '마지막 페이지',
-                                  onPressed: canGoForward ? () => _loadPage(_totalPages - 1) : null,
-                                  scheme: cs,
-                                ),
-                              ],
-                            ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '커뮤니티',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: _espresso,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
                           ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  FilledButton.icon(
+                    onPressed: _openCreateBoard,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF35424A),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text(
+                      '글쓰기',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: SearchBar(
+                controller: _searchController,
+                hintText: '제목이나 내용으로 검색',
+                hintStyle: const WidgetStatePropertyAll(
+                  TextStyle(color: Color(0xFF8A817D)),
+                ),
+                leading: const Icon(
+                  Icons.search_rounded,
+                  color: Color(0xFF5F5652),
+                ),
+                trailing: [
+                  IconButton(
+                    tooltip: '검색',
+                    onPressed: _loading
+                        ? null
+                        : () => _onSearchSubmitted(_searchController.text),
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                  ),
+                ],
+                onSubmitted: _loading ? null : _onSearchSubmitted,
+                elevation: const WidgetStatePropertyAll(0),
+                backgroundColor: const WidgetStatePropertyAll(Colors.white),
+                side: const WidgetStatePropertyAll(
+                  BorderSide(color: Color(0xFFE8DDD3)),
+                ),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _queryTrimmed.isEmpty ? '게시글' : '검색 결과',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: _ink,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$_totalCount개',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: const Color(0xFF8A817D),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: _caramel,
+                onRefresh: _onRefresh,
+                child: _loading && _items.isEmpty
+                    ? const Center(
+                        child: CircularProgressIndicator(color: _caramel),
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
+                        itemCount: _items.isEmpty ? 1 : _items.length,
+                        itemBuilder: (context, index) {
+                          if (_items.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 72),
+                              child: Column(
+                                children: [
+                                  const Icon(
+                                    Icons.forum_outlined,
+                                    size: 42,
+                                    color: Color(0xFFB6AAA2),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _queryTrimmed.isEmpty
+                                        ? '아직 작성된 글이 없어요.'
+                                        : '검색 결과가 없어요.',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: const Color(0xFF6F6560),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          final item = _items[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _BoardListTile(
+                              item: item,
+                              onTap: () => _openBoardDetail(item.id),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+            if (_items.isNotEmpty) _buildPagination(),
+          ],
+        ),
       ),
     );
   }
@@ -406,15 +459,11 @@ class _PagingMiniButton extends StatelessWidget {
     required this.label,
     required this.tooltip,
     required this.onPressed,
-    required this.scheme,
-    this.compact = false,
   });
 
   final String label;
   final String tooltip;
   final VoidCallback? onPressed;
-  final ColorScheme scheme;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -423,18 +472,14 @@ class _PagingMiniButton extends StatelessWidget {
       child: TextButton(
         onPressed: onPressed,
         style: TextButton.styleFrom(
-          minimumSize: Size(compact ? 34 : 40, 40),
-          padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 6),
+          minimumSize: const Size(40, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          foregroundColor: scheme.onSurface,
+          foregroundColor: const Color(0xFF35424A),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            letterSpacing: compact ? -0.5 : 0,
-          ),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -446,31 +491,28 @@ class _PagingPageButton extends StatelessWidget {
     required this.pageLabel,
     required this.selected,
     required this.onPressed,
-    required this.scheme,
   });
 
   final String pageLabel;
   final bool selected;
   final VoidCallback? onPressed;
-  final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
-    final cs = scheme;
     if (selected) {
       return Container(
         constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: cs.primaryContainer,
-          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFFF2E7DC),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           pageLabel,
-          style: TextStyle(
-            color: cs.onPrimaryContainer,
-            fontWeight: FontWeight.w600,
+          style: const TextStyle(
+            color: Color(0xFF3B241C),
+            fontWeight: FontWeight.w800,
           ),
         ),
       );
@@ -480,8 +522,8 @@ class _PagingPageButton extends StatelessWidget {
       style: TextButton.styleFrom(
         minimumSize: const Size(40, 40),
         padding: const EdgeInsets.symmetric(horizontal: 10),
-        foregroundColor: cs.primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        foregroundColor: const Color(0xFF6F6560),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(pageLabel),
     );
@@ -492,138 +534,108 @@ class _BoardListItem {
   const _BoardListItem({
     required this.id,
     required this.title,
+    required this.authorNickname,
     required this.viewCount,
     required this.dateLabel,
   });
 
   final int id;
   final String title;
+  final String authorNickname;
   final int viewCount;
   final String dateLabel;
 }
 
-class _BoardTableHeaderRow extends StatelessWidget {
-  const _BoardTableHeaderRow({required this.scheme});
-
-  final ColorScheme scheme;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: scheme.onSurfaceVariant,
-        );
-    return Material(
-      color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 36,
-              child: Text('순번', textAlign: TextAlign.center, style: style),
-            ),
-            Expanded(
-              flex: 5,
-              child: Text(
-                '제목',
-                textAlign: TextAlign.center,
-                style: style,
-              ),
-            ),
-            SizedBox(
-              width: 52,
-              child: Text('조회수', textAlign: TextAlign.right, style: style),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 86,
-              child: Text(
-                '날짜',
-                textAlign: TextAlign.center,
-                style: style,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _BoardListTile extends StatelessWidget {
-  const _BoardListTile({
-    required this.rowNumber,
-    required this.item,
-    required this.onTap,
-  });
+  const _BoardListTile({required this.item, required this.onTap});
 
-  final int rowNumber;
   final _BoardListItem item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final bodySmall = theme.textTheme.bodySmall;
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 36,
-              child: Text(
-                '$rowNumber',
-                textAlign: TextAlign.center,
-                style: bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 15, 12, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: _BoardScreenState._ink,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            item.authorNickname.isEmpty
+                                ? '작성자 정보 없음'
+                                : item.authorNickname,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF6F6560),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '·',
+                            style: TextStyle(color: Color(0xFFB6AAA2)),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.visibility_outlined,
+                          size: 15,
+                          color: Color(0xFF8A817D),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${item.viewCount}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF8A817D),
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            item.dateLabel.isEmpty ? '—' : item.dateLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF8A817D),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Expanded(
-              child: Text(
-                item.title,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface,
-                ),
-              ),
-            ),
-            SizedBox(
-              width: 52,
-              child: Text(
-                '${item.viewCount}',
-                textAlign: TextAlign.right,
-                style: bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 86,
-              child: Text(
-                item.dateLabel.isEmpty ? '—' : item.dateLabel,
-                textAlign: TextAlign.right,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontSize: (bodySmall.fontSize ?? 12) - 0.5,
-                ),
-              ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFB6AAA2)),
+            ],
+          ),
         ),
       ),
     );

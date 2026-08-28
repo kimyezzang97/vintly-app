@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_config.dart';
@@ -18,6 +19,12 @@ import '../../../shared/auth/token_storage.dart';
 import '../data/board_api.dart';
 import '../data/board_api_paths.dart';
 import '../data/board_detail.dart';
+
+const Color _createInk = Color(0xFF241A17);
+const Color _createEspresso = Color(0xFF3B241C);
+const Color _createCaramel = Color(0xFFA96F3D);
+const Color _createBackground = Color(0xFFF4F3F1);
+const Color _createMuted = Color(0xFF8A817D);
 
 String _boardCreateResolveImageUrl(String baseUrl, String raw) {
   final trimmed = raw.trim();
@@ -256,43 +263,105 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    InputDecoration fieldDecoration(String hint) => InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: _createMuted),
+          filled: true,
+          fillColor: const Color(0xFFF7F6F4),
+          contentPadding: const EdgeInsets.all(16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE8E1DA)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE8E1DA)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _createCaramel, width: 1.5),
+          ),
+        );
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+      backgroundColor: _createBackground,
       appBar: AppBar(
-        title: Text(_isEdit ? '글 수정' : '글 작성'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF35424A),
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          _isEdit ? '글 수정' : '글쓰기',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: _createEspresso,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(
             height: 1,
             thickness: 1,
-            color: cs.outline.withValues(alpha: 0.2),
+            color: const Color(0xFFD8CEC6),
           ),
         ),
         actions: [
-          TextButton(
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton(
             onPressed: _submitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF35424A),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              elevation: 0,
+            ),
             child: _submitting
-                ? SizedBox(
+                ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: cs.primary,
+                      color: Colors.white,
                     ),
                   )
                 : Text(_isEdit ? '저장' : '등록'),
+            ),
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 22),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFE8E3DF)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
           if (_isEdit && _retainedExisting.isNotEmpty) ...[
             Text(
-              '유지할 기존 이미지 (×로 제거)',
+              '기존 이미지',
               style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+                color: _createInk,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '제거할 사진은 우측 상단의 ×를 눌러주세요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: _createMuted,
               ),
             ),
             const SizedBox(height: 8),
@@ -325,7 +394,7 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                         clipBehavior: Clip.none,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(14),
                             child: Image.network(
                               resolved,
                               width: 96,
@@ -345,6 +414,8 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                             right: -4,
                             child: IconButton.filled(
                               style: IconButton.styleFrom(
+                                backgroundColor: const Color(0xFF35424A),
+                                foregroundColor: Colors.white,
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
                                 fixedSize: const Size(28, 28),
@@ -362,45 +433,62 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
           ],
+          Text(
+            '제목',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: _createInk,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _titleController,
-            decoration: const InputDecoration(
-              labelText: '제목',
-              hintText: '제목',
-              border: OutlineInputBorder(),
-            ),
+            decoration: fieldDecoration('제목을 입력하세요'),
             textInputAction: TextInputAction.next,
             maxLength: 200,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          Text(
+            '내용',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: _createInk,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _contentController,
-            decoration: const InputDecoration(
-              labelText: '내용',
-              hintText: '내용',
-              border: OutlineInputBorder(),
-              alignLabelWithHint: true,
-            ),
-            minLines: 6,
+            decoration: fieldDecoration('공유하고 싶은 내용을 작성해 주세요'),
+            minLines: 8,
             maxLines: 14,
             maxLength: 10000,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Row(
             children: [
               Text(
                 '이미지 (최대 $_maxImages장)',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: _createInk,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const Spacer(),
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 onPressed: _totalImageCount >= _maxImages || _submitting
                     ? null
                     : _pickImages,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF35424A),
+                  side: const BorderSide(color: Color(0xFFD8CEC6)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('사진'),
+                label: const Text('사진 추가'),
               ),
             ],
           ),
@@ -408,7 +496,7 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
           if (_images.isEmpty)
             Text(
               '첨부 없이 등록할 수 있습니다.',
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(color: _createMuted),
             )
           else
             SizedBox(
@@ -422,7 +510,7 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                     clipBehavior: Clip.none,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(14),
                         child: Image.file(
                           File(_images[index].path),
                           width: 96,
@@ -441,6 +529,8 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                         right: -4,
                         child: IconButton.filled(
                           style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFF35424A),
+                            foregroundColor: Colors.white,
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             fixedSize: const Size(28, 28),
@@ -454,7 +544,11 @@ class _BoardCreateScreenState extends State<BoardCreateScreen> {
                 },
               ),
             ),
+              ],
+            ),
+          ),
         ],
+      ),
       ),
     );
   }
