@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../features/board/presentation/board_screen.dart';
 import '../features/mypage/presentation/mypage_screen.dart';
 import '../features/vintage/presentation/vintage_list_screen.dart';
+import '../features/youtube/presentation/youtube_recommendation_screen.dart';
 
-/// 하단 메뉴바가 있는 메인 쉘. Shop / Board / MyPage.
+/// 하단 메뉴바가 있는 메인 쉘. Shop / Board / YouTube / MyPage.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -23,6 +24,7 @@ class _MainShellState extends State<MainShell> {
         children: const [
           VintageListScreen(),
           BoardScreen(),
+          YoutubeRecommendationScreen(),
           MyPageScreen(),
         ],
       ),
@@ -64,11 +66,20 @@ class _MainShellState extends State<MainShell> {
                 ),
                 Expanded(
                   child: _NavTab(
+                    icon: Icons.smart_display_outlined,
+                    selectedIcon: Icons.smart_display_rounded,
+                    label: 'YouTube',
+                    selected: _currentIndex == 2,
+                    onTap: () => setState(() => _currentIndex = 2),
+                  ),
+                ),
+                Expanded(
+                  child: _NavTab(
                     icon: Icons.person_outline_rounded,
                     selectedIcon: Icons.person_rounded,
                     label: '마이',
-                    selected: _currentIndex == 2,
-                    onTap: () => setState(() => _currentIndex = 2),
+                    selected: _currentIndex == 3,
+                    onTap: () => setState(() => _currentIndex = 3),
                   ),
                 ),
               ],
@@ -107,14 +118,18 @@ class _NavTab extends StatelessWidget {
           children: [
             Icon(
               selected ? selectedIcon : icon,
-              color: selected ? const Color(0xFF4E342E) : const Color(0xFF8A817D),
+              color: selected
+                  ? const Color(0xFF4E342E)
+                  : const Color(0xFF8A817D),
               size: 24,
             ),
             const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
-                color: selected ? const Color(0xFF4E342E) : const Color(0xFF8A817D),
+                color: selected
+                    ? const Color(0xFF4E342E)
+                    : const Color(0xFF8A817D),
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),

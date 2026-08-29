@@ -31,6 +31,7 @@
 - [x] 빈티지 숍 좋아요 등록·취소
 - [x] 빈티지 숍 댓글·대댓글 조회와 작성
 - [x] 커뮤니티 게시글 CRUD·좋아요·댓글
+- [x] 빈티지 YouTube 추천 목록 조회
 - [x] 마이페이지의 닉네임·비밀번호 변경, 로그아웃, 회원 탈퇴
 - [ ] 알림과 채팅
 
@@ -79,12 +80,16 @@
 - 로그인·회원가입
   - 이메일·비밀번호·닉네임을 입력하고 인증 완료 후 메인 화면으로 이동한다.
 - 메인 화면
-  - 빈티지 샵, 커뮤니티, 마이 탭을 제공한다.
+  - 빈티지 샵, 커뮤니티, YouTube, 마이 탭을 제공한다.
 - 빈티지 샵
   - 네이버 지도, 숍 마커와 상세 바텀시트를 제공한다.
   - 상세 바텀시트에는 이미지·이름·주소·좋아요·댓글/대댓글과 입력 영역을 표시한다.
 - 커뮤니티
   - 게시글 목록·상세·글쓰기 화면을 제공한다.
+- YouTube
+  - 빈티지 관련 YouTube 추천 목록을 제공한다.
+  - `GET /api/v1/youtube-links`로 최신 등록순 추천 목록을 무한 스크롤 방식으로 페이지네이션 조회한다.
+  - 추천 카드를 선택하면 서버가 제공한 YouTube URL을 외부 앱 또는 브라우저에서 연다.
 - 마이
   - 계정 정보와 계정 관리 기능을 제공한다.
 
@@ -94,6 +99,7 @@
 - `VintageShopDetail`: `vintageId`, `name`, `state`, `district`, `detailAddr`, `imgList`, `likeCount`, `liked`, `comments` 등
 - `VintageComment`: `commentId`, `memberId`, `nickname`, `content`, `createdAt`, `parentCommentId`
 - `VintageImage`: `vintageImgId`, `imgPath`
+- `YoutubeLink`: `youtubeLinkId`, `url`, `title`, `description`, `isAd`, `createdAt`, `updatedAt`
 - API 응답 모델은 실제 서버 계약을 기준으로 하며 서버에 없는 필드를 임의로 만들지 않는다.
 
 ### 디자인과 비기능 요구사항

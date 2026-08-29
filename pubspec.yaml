@@ -45,6 +45,9 @@ dependencies:
   # 게시판 이미지 첨부(갤러리)
   image_picker: ^1.1.2
 
+  # YouTube 추천 링크를 기기의 YouTube 앱 또는 브라우저에서 엽니다.
+  url_launcher: ^6.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
