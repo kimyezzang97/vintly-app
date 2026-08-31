@@ -6,6 +6,39 @@ import 'package:flutter/foundation.dart';
 const bool _kApiLogFromEnv =
     bool.fromEnvironment('API_LOG', defaultValue: false);
 
+class ApiLogSanitizer {
+  ApiLogSanitizer._();
+
+  static const _sensitiveHeaders = {
+    'access',
+    'authorization',
+    'cookie',
+    'set-cookie',
+  };
+
+  static Map<String, String> requestHeaders(Map<String, String> headers) {
+    return {
+      for (final entry in headers.entries)
+        entry.key: _isSensitive(entry.key) ? '***' : entry.value,
+    };
+  }
+
+  static Map<String, List<String>> responseHeaders(
+    Map<String, List<String>> headers,
+  ) {
+    return {
+      for (final entry in headers.entries)
+        entry.key: _isSensitive(entry.key)
+            ? const <String>['***']
+            : List<String>.from(entry.value, growable: false),
+    };
+  }
+
+  static bool _isSensitive(String name) {
+    return _sensitiveHeaders.contains(name.toLowerCase());
+  }
+}
+
 class ApiLogger {
   static bool get _enabled =>
       kDebugMode || kProfileMode || _kApiLogFromEnv;
@@ -28,7 +61,9 @@ class ApiLogger {
     if (!_enabled) return;
     _line('[API][REQ] $method $uri');
     if (headers != null && headers.isNotEmpty) {
-      _line('[API][REQ][headers] $headers');
+      _line(
+        '[API][REQ][headers] ${ApiLogSanitizer.requestHeaders(headers)}',
+      );
     }
     if (body != null) {
       _line('[API][REQ][body] $body');
@@ -46,7 +81,9 @@ class ApiLogger {
     _line('[API][RES] $method $uri');
     _line('[API][RES][status] $statusCode');
     if (headers != null && headers.isNotEmpty) {
-      _line('[API][RES][headers] $headers');
+      _line(
+        '[API][RES][headers] ${ApiLogSanitizer.responseHeaders(headers)}',
+      );
     }
     _line('[API][RES][body] $body');
   }

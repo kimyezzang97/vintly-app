@@ -10,6 +10,7 @@
 // =============================================================================
 
 import '../api/api_client.dart';
+import '../api/api_response.dart';
 import 'token_storage.dart';
 
 /// Set-Cookie 헤더 값들에서 쿠키 이름에 해당하는 값만 추출
@@ -23,6 +24,14 @@ String? _extractCookie(List<String> setCookieHeaders, String name) {
     if (key == name) {
       return kv.sublist(1).join('=').trim();
     }
+  }
+  return null;
+}
+
+String? accessTokenFromResponse(ApiResponse response) {
+  for (final value in response.header('access')) {
+    final token = value.trim();
+    if (token.isNotEmpty) return token;
   }
   return null;
 }
@@ -48,14 +57,8 @@ Future<bool> reissueTokens(String baseUrl) async {
     }
 
     // access: 헤더에서
-    String? accessToken;
-    for (final v in response.header('access')) {
-      final s = v.trim();
-      if (s.isNotEmpty) {
-        accessToken = s;
-        break;
-      }
-    }
+    final accessToken = accessTokenFromResponse(response);
+    if (accessToken == null) return false;
 
     // refresh: Set-Cookie에서
     final cookies = response.header('set-cookie');

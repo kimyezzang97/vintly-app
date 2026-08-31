@@ -17,6 +17,7 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/api_client.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../data/login_tokens.dart';
 
 /// 로그인 화면을 감싸는 StatelessWidget.
 /// 실제 UI/상태는 _LoginScreenBody(StatefulWidget)에서 처리합니다.
@@ -66,22 +67,6 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
     super.dispose();
   }
 
-  /// Set-Cookie 헤더 값들에서 특정 이름의 쿠키 값만 추출합니다.
-  /// 예: "refresh=abc123; Path=/; HttpOnly" → name이 "refresh"면 "abc123" 반환
-  String? _extractCookieToken(List<String> cookies, String name) {
-    for (final cookie in cookies) {
-      final parts = cookie.split(';');
-      if (parts.isEmpty) continue;
-      final kv = parts.first.split('=');
-      if (kv.length < 2) continue;
-      final key = kv[0].trim();
-      if (key == name) {
-        return kv.sublist(1).join('=').trim();
-      }
-    }
-    return null;
-  }
-
   /// 로그인 버튼을 눌렀을 때 호출됩니다.
   /// 1) 폼 검증 2) API 호출 3) 토큰 파싱 및 저장 4) 홈으로 이동 또는 에러 메시지
   Future<void> _submit() async {
@@ -115,66 +100,63 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
         if (!mounted) return;
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          // ----- access 토큰: 응답 헤더에서만 읽기 -----
-          String? accessToken;
-          final accessValues = response.header('access');
-          for (final v in accessValues) {
-            final s = v.trim();
-            if (s.isNotEmpty) {
-              accessToken = s;
-              break;
-            }
-          }
-          // authorization 헤더에 토큰이 그대로 오는 경우도 처리 (Bearer 없이)
-          if (accessToken == null) {
-            for (final raw in response.header('authorization')) {
-              final v = raw.trim();
-              if (v.isNotEmpty) {
-                accessToken = v.toLowerCase().startsWith('bearer ')
-                    ? v.substring(7).trim()
-                    : v;
-                break;
-              }
-            }
+          final tokens = LoginTokens.fromResponse(response);
+          if (tokens == null) {
+            await _clearAuthentication();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('서버에서 인증 정보를 받지 못했습니다. 다시 시도해 주세요.'),
+              ),
+            );
+            return;
           }
 
-          // ----- refresh 토큰: Set-Cookie에서만 읽기 -----
-          final cookies = response.header('set-cookie');
-          final refreshToken = _extractCookieToken(cookies, 'refresh');
-
-          // 받은 토큰을 기기의 secure storage에 저장합니다.
-          // (에뮬레이터/기기 따라 저장 실패할 수 있어 try-catch로 감쌈)
-          bool saveOk = true;
           try {
             await TokenStorage.saveTokens(
-              access: accessToken,
-              refresh: refreshToken,
+              access: tokens.access,
+              refresh: tokens.refresh,
             );
             await TokenStorage.saveLastLoginEmail(_emailController.text.trim());
-            // /me 호출해 현재 사용자 정보를 메모리에 세팅 (댓글 수정/삭제 버튼 표시용)
-            final baseUrl = AppConfig.instance.backend.baseUrl;
-            await fetchAndSetCurrentUser(baseUrl);
           } catch (e, st) {
-            saveOk = false;
             debugPrint('[Login] TokenStorage.saveTokens failed: $e');
+            debugPrint('[Login] stack: $st');
+            await _clearAuthentication();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('인증 정보를 안전하게 저장하지 못했습니다. 다시 시도해 주세요.'),
+              ),
+            );
+            return;
+          }
+
+          bool currentUserLoaded = false;
+          try {
+            currentUserLoaded = await fetchAndSetCurrentUser(
+              AppConfig.instance.backend.baseUrl,
+            );
+          } catch (e, st) {
+            debugPrint('[Login] current user verification failed: $e');
             debugPrint('[Login] stack: $st');
           }
 
-          if (!mounted) return;
-
-          debugPrint('Login success. access=${accessToken != null ? '***' : 'null'}, refresh=${refreshToken != null ? '***' : 'null'}');
-
-          if (saveOk) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('로그인 성공')),
-            );
-          } else {
+          if (!currentUserLoaded) {
+            await _clearAuthentication();
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('로그인 성공했으나 토큰 저장에 실패했습니다. 앱 재시작 시 다시 로그인해 주세요.'),
+                content: Text('사용자 정보를 확인하지 못했습니다. 다시 로그인해 주세요.'),
               ),
             );
+            return;
           }
+
+          if (!mounted) return;
+          debugPrint('Login success. access=***, refresh=***');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('로그인 성공')),
+          );
           Navigator.of(context).pushReplacementNamed(AppRoutes.home);
           return;
         }
@@ -209,6 +191,15 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _clearAuthentication() async {
+    CurrentUserHolder.clear();
+    try {
+      await TokenStorage.clearAll();
+    } catch (e) {
+      debugPrint('[Login] failed to clear tokens: $e');
     }
   }
 
