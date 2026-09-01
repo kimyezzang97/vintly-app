@@ -1,4 +1,4 @@
-package com.example.vintly_app
+package com.vintly.app
 
 import io.flutter.embedding.android.FlutterActivity
 

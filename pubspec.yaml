@@ -80,7 +80,10 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/app_icon.png"
+  image_path: "assets/app_icon_square.png"
+  adaptive_icon_background: "#4E342E"
+  adaptive_icon_foreground: "assets/app_icon_foreground.png"
+  adaptive_icon_foreground_inset: 8
   remove_alpha_ios: true  # App Store는 알파 채널 미지원
 
   # An image asset can refer to one or more resolution-specific "variants", see

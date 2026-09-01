@@ -8,6 +8,7 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../../../shared/legal/legal_links.dart';
 
 const double _mypageDialogRadius = 22;
 const Color _mypageInk = Color(0xFF241A17);
@@ -97,158 +98,188 @@ class _MyPageScreenState extends State<MyPageScreen> {
         statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-      backgroundColor: _mypageBackground,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            color: Colors.white,
-            padding: EdgeInsets.fromLTRB(
-              20,
-              MediaQuery.paddingOf(context).top + 18,
-              20,
-              18,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'VINTLY',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: _mypageCaramel,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.4,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  '마이',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: _mypageEspresso,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFFE8E3DF)),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: const Color(0xFFF2E7DC),
-                        foregroundColor: _mypageEspresso,
-                        child: Text(
-                          initial,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              nickname,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: _mypageInk,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              email,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: _mypageMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 26),
-                const _SectionTitle(title: '계정 설정'),
-                const SizedBox(height: 10),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE8E3DF)),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      _MenuItem(
-                        icon: Icons.badge_outlined,
-                        label: '닉네임 변경',
-                        onTap: () => _showChangeNicknameDialog(context),
-                      ),
-                      const Divider(
-                        height: 1,
-                        indent: 56,
-                        color: Color(0xFFE8E1DA),
-                      ),
-                      _MenuItem(
-                        icon: Icons.lock_outline_rounded,
-                        label: '비밀번호 변경',
-                        onTap: () => _showChangePasswordDialog(context),
-                      ),
-                      const Divider(
-                        height: 1,
-                        indent: 56,
-                        color: Color(0xFFE8E1DA),
-                      ),
-                      _MenuItem(
-                        icon: Icons.person_remove_outlined,
-                        label: '회원탈퇴',
-                        destructive: true,
-                        onTap: () => _showWithdrawAccountDialog(context),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                OutlinedButton.icon(
-                  onPressed: () => _logout(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF5F5652),
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFD8CEC6)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+        backgroundColor: _mypageBackground,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              color: Colors.white,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 18,
+                20,
+                18,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'VINTLY',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: _mypageCaramel,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2.4,
                     ),
                   ),
-                  icon: const Icon(Icons.logout_rounded, size: 19),
-                  label: const Text(
-                    '로그아웃',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  const SizedBox(height: 5),
+                  Text(
+                    '마이',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: _mypageEspresso,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: const Color(0xFFE8E3DF)),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: const Color(0xFFF2E7DC),
+                          foregroundColor: _mypageEspresso,
+                          child: Text(
+                            initial,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                nickname,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: _mypageInk,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: _mypageMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+                  const _SectionTitle(title: '계정 설정'),
+                  const SizedBox(height: 10),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE8E3DF)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        _MenuItem(
+                          icon: Icons.badge_outlined,
+                          label: '닉네임 변경',
+                          onTap: () => _showChangeNicknameDialog(context),
+                        ),
+                        const Divider(
+                          height: 1,
+                          indent: 56,
+                          color: Color(0xFFE8E1DA),
+                        ),
+                        _MenuItem(
+                          icon: Icons.lock_outline_rounded,
+                          label: '비밀번호 변경',
+                          onTap: () => _showChangePasswordDialog(context),
+                        ),
+                        const Divider(
+                          height: 1,
+                          indent: 56,
+                          color: Color(0xFFE8E1DA),
+                        ),
+                        _MenuItem(
+                          icon: Icons.person_remove_outlined,
+                          label: '회원탈퇴',
+                          destructive: true,
+                          onTap: () => _showWithdrawAccountDialog(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const _SectionTitle(title: '약관 및 정책'),
+                  const SizedBox(height: 10),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE8E3DF)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        _MenuItem(
+                          icon: Icons.description_outlined,
+                          label: '이용약관',
+                          onTap: () => openLegalUrl(context, termsOfServiceUrl),
+                        ),
+                        const Divider(
+                          height: 1,
+                          indent: 56,
+                          color: Color(0xFFE8E1DA),
+                        ),
+                        _MenuItem(
+                          icon: Icons.privacy_tip_outlined,
+                          label: '개인정보처리방침',
+                          onTap: () => openLegalUrl(context, privacyPolicyUrl),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: () => _logout(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF5F5652),
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFFD8CEC6)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 19),
+                    label: const Text(
+                      '로그아웃',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -257,10 +288,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
     await TokenStorage.clearAll();
     CurrentUserHolder.clear();
     if (!context.mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
   }
 
   Future<void> _showWithdrawAccountDialog(BuildContext context) async {
@@ -313,10 +343,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     const SnackBar(content: Text('회원탈퇴가 처리되었습니다.')),
                   );
                   if (!context.mounted) return;
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    AppRoutes.login,
-                    (route) => false,
-                  );
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
                 });
               } catch (_) {
                 setSt(() => errorText = '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
@@ -331,7 +360,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
               shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(_mypageDialogRadius)),
+                borderRadius: BorderRadius.all(
+                  Radius.circular(_mypageDialogRadius),
+                ),
                 side: BorderSide(color: Color(0xFFE8E1DA)),
               ),
               titlePadding: EdgeInsets.zero,
@@ -365,7 +396,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           Expanded(
                             child: Text(
                               '탈퇴 시 계정과 관련 데이터가 삭제되며 복구할 수 없습니다.',
-                              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                              style: Theme.of(ctx).textTheme.bodyMedium
+                                  ?.copyWith(
                                     color: const Color(0xFF7A3E3E),
                                     height: 1.45,
                                   ),
@@ -383,11 +415,15 @@ class _MyPageScreenState extends State<MyPageScreen> {
                         label: '비밀번호 확인',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
                           ),
                           onPressed: submitting
                               ? null
-                              : () => setSt(() => obscurePassword = !obscurePassword),
+                              : () => setSt(
+                                  () => obscurePassword = !obscurePassword,
+                                ),
                         ),
                       ),
                     ),
@@ -431,7 +467,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
   }
 
   Future<void> _showChangeNicknameDialog(BuildContext context) async {
-    final controller = TextEditingController(text: CurrentUserHolder.nickname ?? '');
+    final controller = TextEditingController(
+      text: CurrentUserHolder.nickname ?? '',
+    );
     final baseUrl = AppConfig.instance.backend.baseUrl;
     const path = '/api/v1/members/me/nickname';
     final parentContext = context;
@@ -463,7 +501,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 );
                 if (!ctx.mounted) return;
                 final code = response.code ?? response.statusCode;
-                if (response.statusCode == 401 || code == 401 || response.statusCode == 403) {
+                if (response.statusCode == 401 ||
+                    code == 401 ||
+                    response.statusCode == 403) {
                   routePopped = true;
                   Navigator.of(ctx).pop();
                   WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -474,7 +514,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 }
                 final success = response.json['success'] == true;
                 if (!success) {
-                  setDialogState(() => errorText = response.msg ?? '닉네임 변경에 실패했습니다.');
+                  setDialogState(
+                    () => errorText = response.msg ?? '닉네임 변경에 실패했습니다.',
+                  );
                   return;
                 }
                 final refreshed = await fetchAndSetCurrentUser(baseUrl);
@@ -498,7 +540,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
                   );
                 });
               } catch (_) {
-                setDialogState(() => errorText = '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+                setDialogState(
+                  () => errorText = '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+                );
               } finally {
                 if (!routePopped && ctx.mounted) {
                   setDialogState(() => submitting = false);
@@ -510,7 +554,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
               shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(_mypageDialogRadius)),
+                borderRadius: BorderRadius.all(
+                  Radius.circular(_mypageDialogRadius),
+                ),
                 side: BorderSide(color: Color(0xFFE8E1DA)),
               ),
               titlePadding: EdgeInsets.zero,
@@ -543,7 +589,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           Expanded(
                             child: Text(
                               '닉네임은 마지막 변경일로부터 14일 이후에 다시 변경할 수 있습니다.',
-                              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(ctx).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: const Color(0xFF6F6560),
                                     height: 1.4,
                                   ),
@@ -556,17 +603,15 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     TextField(
                       controller: controller,
                       enabled: !submitting,
-                      decoration: _mypageDialogFieldDecoration(
-                        label: '새 닉네임',
-                      ),
+                      decoration: _mypageDialogFieldDecoration(label: '새 닉네임'),
                       maxLength: 30,
-                      buildCounter: (
-                        context, {
-                        required int currentLength,
-                        required bool isFocused,
-                        required int? maxLength,
-                      }) =>
-                          null,
+                      buildCounter:
+                          (
+                            context, {
+                            required int currentLength,
+                            required bool isFocused,
+                            required int? maxLength,
+                          }) => null,
                     ),
                   ],
                 ),
@@ -644,10 +689,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 final response = await patchJsonWithAuth(
                   baseUrl,
                   path,
-                  body: {
-                    'currentPassword': cur,
-                    'newPassword': nw,
-                  },
+                  body: {'currentPassword': cur, 'newPassword': nw},
                 );
                 if (!ctx.mounted) return;
                 // 비밀번호 오류 등으로 서버가 401/403을 주는 경우가 많아, 여기서는 로그아웃하지 않음
@@ -680,13 +722,18 @@ class _MyPageScreenState extends State<MyPageScreen> {
             return AlertDialog(
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(horizontal: horizontalInset, vertical: 24),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: horizontalInset,
+                vertical: 24,
+              ),
               constraints: BoxConstraints(
                 minWidth: math.min(passwordDialogMinW, dialogMaxW),
                 maxWidth: dialogMaxW,
               ),
               shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(_mypageDialogRadius)),
+                borderRadius: BorderRadius.all(
+                  Radius.circular(_mypageDialogRadius),
+                ),
                 side: BorderSide(color: Color(0xFFE8E1DA)),
               ),
               titlePadding: EdgeInsets.zero,
@@ -708,10 +755,16 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       decoration: _mypageDialogFieldDecoration(
                         label: '현재 비밀번호',
                         suffixIcon: IconButton(
-                          icon: Icon(obscureCurrent ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                          icon: Icon(
+                            obscureCurrent
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
                           onPressed: submitting
                               ? null
-                              : () => setSt(() => obscureCurrent = !obscureCurrent),
+                              : () => setSt(
+                                  () => obscureCurrent = !obscureCurrent,
+                                ),
                         ),
                       ),
                     ),
@@ -723,8 +776,14 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       decoration: _mypageDialogFieldDecoration(
                         label: '새 비밀번호',
                         suffixIcon: IconButton(
-                          icon: Icon(obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                          onPressed: submitting ? null : () => setSt(() => obscureNew = !obscureNew),
+                          icon: Icon(
+                            obscureNew
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: submitting
+                              ? null
+                              : () => setSt(() => obscureNew = !obscureNew),
                         ),
                       ),
                     ),
@@ -736,10 +795,16 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       decoration: _mypageDialogFieldDecoration(
                         label: '새 비밀번호 확인',
                         suffixIcon: IconButton(
-                          icon: Icon(obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                          icon: Icon(
+                            obscureConfirm
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
                           onPressed: submitting
                               ? null
-                              : () => setSt(() => obscureConfirm = !obscureConfirm),
+                              : () => setSt(
+                                  () => obscureConfirm = !obscureConfirm,
+                                ),
                         ),
                       ),
                     ),
@@ -872,10 +937,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
     await TokenStorage.clearAll();
     CurrentUserHolder.clear();
     if (!context.mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
   }
 }
 
@@ -931,9 +995,7 @@ class _MenuItem extends StatelessWidget {
               Text(
                 label,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: destructive
-                      ? const Color(0xFFC94848)
-                      : _mypageInk,
+                  color: destructive ? const Color(0xFFC94848) : _mypageInk,
                   fontWeight: FontWeight.w600,
                 ),
               ),

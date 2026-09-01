@@ -9,5 +9,7 @@ void main() {
     expect(find.text('VINTLY'), findsOneWidget);
     expect(find.text('로그인'), findsOneWidget);
     expect(find.text('회원가입'), findsOneWidget);
+    expect(find.text('이용약관'), findsOneWidget);
+    expect(find.text('개인정보처리방침'), findsOneWidget);
   });
 }

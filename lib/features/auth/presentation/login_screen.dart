@@ -17,6 +17,7 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/api_client.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../../../shared/legal/legal_links.dart';
 import '../data/login_tokens.dart';
 
 /// 로그인 화면을 감싸는 StatelessWidget.
@@ -42,8 +43,9 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   // 8~20자, 영문/숫자/특수문자 각각 최소 1개 포함
-  static final RegExp _passwordRegex =
-      RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9\s])\S{8,20}$');
+  static final RegExp _passwordRegex = RegExp(
+    r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9\s])\S{8,20}$',
+  );
   bool _obscurePassword = true;
   bool _isSubmitting = false;
 
@@ -145,26 +147,24 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
             await _clearAuthentication();
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('사용자 정보를 확인하지 못했습니다. 다시 로그인해 주세요.'),
-              ),
+              const SnackBar(content: Text('사용자 정보를 확인하지 못했습니다. 다시 로그인해 주세요.')),
             );
             return;
           }
 
           if (!mounted) return;
           debugPrint('Login success. access=***, refresh=***');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('로그인 성공')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('로그인 성공')));
           Navigator.of(context).pushReplacementNamed(AppRoutes.home);
           return;
         }
 
         final msg = response.msg ?? '로그인에 실패했습니다. 아이디/비밀번호를 확인해 주세요.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       } on FormatException catch (e) {
         // 서버가 HTML 에러 페이지 등 JSON이 아닌 응답을 주면 발생
         if (!mounted) return;
@@ -224,7 +224,8 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
                     Text(
                       'VINTLY',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      style: Theme.of(context).textTheme.headlineLarge
+                          ?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: cs.primary,
                           ),
@@ -233,10 +234,9 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
                     Text(
                       '빈티지를 좋아하는 사람들을 위한 커뮤니티',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: cs.onSurfaceVariant),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 28),
                     TextFormField(
@@ -318,18 +318,13 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
                     OutlinedButton(
                       onPressed: _isSubmitting
                           ? null
-                          : () => Navigator.of(context).pushNamed(AppRoutes.signUp),
+                          : () => Navigator.of(
+                              context,
+                            ).pushNamed(AppRoutes.signUp),
                       child: const Text('회원가입'),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      '계속 진행하면 서비스 이용약관 및 개인정보처리방침에 동의한 것으로 간주됩니다.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
-                    ),
+                    const LegalLinks(),
                   ],
                 ),
               ),
@@ -340,4 +335,3 @@ class _LoginScreenBodyState extends State<_LoginScreenBody> {
     );
   }
 }
-

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../app/app_config.dart';
 import '../../../shared/api/api_client.dart';
+import '../../../shared/legal/legal_links.dart';
 import '../../../shared/ui/vintly_dialog.dart';
 
 class SignUpScreen extends StatelessWidget {
@@ -27,13 +28,14 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
-  static final RegExp _nicknameRegex =
-      RegExp(r'^[가-힣A-Za-z0-9_-]{2,10}$');
+  static final RegExp _nicknameRegex = RegExp(r'^[가-힣A-Za-z0-9_-]{2,10}$');
   // 8~20자, 영문/숫자/특수문자 각각 최소 1개 포함
-  static final RegExp _passwordRegex =
-      RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9\s])\S{8,20}$');
+  static final RegExp _passwordRegex = RegExp(
+    r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9\s])\S{8,20}$',
+  );
   bool _obscurePassword = true;
   bool _obscurePasswordConfirm = true;
+  bool _hasAcceptedTerms = false;
   bool _isSubmitting = false;
 
   @override
@@ -48,7 +50,7 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
   Future<void> _submit() async {
     final form = _formKey.currentState;
     if (form == null) return;
-    if (!form.validate()) return;
+    if (!_hasAcceptedTerms || !form.validate()) return;
 
     setState(() => _isSubmitting = true);
     try {
@@ -62,7 +64,10 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
       };
 
       try {
-        final response = await api.postJson('/api/v1/members/join', body: payload);
+        final response = await api.postJson(
+          '/api/v1/members/join',
+          body: payload,
+        );
 
         if (!mounted) return;
 
@@ -120,18 +125,18 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
                   children: [
                     Text(
                       'VINTLY 시작하기',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: cs.primary,
                           ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '기본 정보만 입력하면 바로 사용할 수 있어요.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: cs.onSurfaceVariant),
+                      '기본 정보를 입력하고 이메일 인증을 완료해 주세요.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     TextFormField(
@@ -255,7 +260,9 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
                       validator: (value) {
                         final v = (value ?? '');
                         if (v.isEmpty) return '비밀번호 확인을 입력해 주세요.';
-                        if (!_passwordRegex.hasMatch(_passwordController.text)) {
+                        if (!_passwordRegex.hasMatch(
+                          _passwordController.text,
+                        )) {
                           return '비밀번호 조건을 먼저 확인해 주세요.';
                         }
                         if (v != _passwordController.text) {
@@ -265,8 +272,56 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
                       },
                     ),
                     const SizedBox(height: 16),
+                    Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: _hasAcceptedTerms
+                              ? cs.primary
+                              : cs.outlineVariant,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          CheckboxListTile(
+                            value: _hasAcceptedTerms,
+                            onChanged: _isSubmitting
+                                ? null
+                                : (value) => setState(
+                                    () => _hasAcceptedTerms = value ?? false,
+                                  ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            title: const Text(
+                              '필수 항목에 모두 동의합니다.',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Text('만 14세 이상임을 확인합니다.'),
+                            ),
+                          ),
+                          Divider(height: 1, color: cs.outlineVariant),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            child: LegalLinks(alignment: WrapAlignment.start),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     FilledButton(
-                      onPressed: _isSubmitting ? null : _submit,
+                      onPressed: _isSubmitting || !_hasAcceptedTerms
+                          ? null
+                          : _submit,
                       child: _isSubmitting
                           ? const SizedBox(
                               width: 18,
@@ -277,8 +332,9 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
                     ),
                     const SizedBox(height: 10),
                     TextButton(
-                      onPressed:
-                          _isSubmitting ? null : () => Navigator.of(context).pop(),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       child: const Text('이미 계정이 있어요. 로그인'),
                     ),
                     const SizedBox(height: 16),
@@ -292,4 +348,3 @@ class _SignUpScreenBodyState extends State<_SignUpScreenBody> {
     );
   }
 }
-
