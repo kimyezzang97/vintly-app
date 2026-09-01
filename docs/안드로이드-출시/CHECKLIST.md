@@ -72,6 +72,8 @@ storeFile=G:/내 드라이브/vintly/android-upload-key/vintly-upload-key.jks
 
 현재 `.gitignore`는 `key.properties`, `*.jks`, `*.keystore`를 제외한다. 생성 후 `git status --short`에 민감 파일이 나타나지 않는지 확인한다.
 
+> 개발 환경 주의: `android/key.properties`와 업로드 키 파일은 보안상 Git에 포함되지 않는다. 따라서 저장소를 새 PC에 클론하거나 다른 개발 환경에서 실행할 때는 위 형식으로 `android/key.properties`를 직접 만들고, `storeFile`이 실제 업로드 키 경로를 가리키도록 설정해야 한다. 현재 Gradle 구성은 이 파일이 없으면 debug 실행을 포함한 Android Gradle 설정 단계에서 빌드가 중단된다. 비밀번호나 키 파일은 README, 문서, 소스 코드 또는 Git 저장소에 기록하지 않는다.
+
 ### 4. 인증서 지문 확인
 
 ```powershell

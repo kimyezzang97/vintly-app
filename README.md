@@ -47,7 +47,22 @@ const backendConfig = BackendConfig(
 );
 ```
 
-### 3. Android NDK 설정
+### 3. Android 업로드 키 설정
+
+`android/key.properties`와 업로드 키 파일은 보안상 Git에 포함되지 않습니다. 저장소를 새 PC에 클론하거나 다른 개발 환경에서 Android 앱을 실행할 때는 `android/key.properties`를 직접 생성해야 합니다.
+
+```properties
+storePassword=실제_keystore_비밀번호
+keyPassword=실제_key_비밀번호
+keyAlias=upload
+storeFile=업로드_키의_절대_경로
+```
+
+`storeFile`에는 해당 PC에서 접근 가능한 실제 `.jks` 파일 경로를 입력합니다. 현재 Gradle 구성에서는 이 파일이 없으면 debug 실행을 포함한 Android 빌드 설정 단계가 중단됩니다.
+
+비밀번호, `key.properties`, `.jks` 및 `.keystore` 파일은 README나 소스 코드에 실제 값으로 기록하거나 Git에 커밋하지 마세요. 상세 생성 절차는 [`docs/안드로이드-출시/CHECKLIST.md`](docs/안드로이드-출시/CHECKLIST.md)를 참고하세요.
+
+### 4. Android NDK 설정
 
 Android 앱 빌드에는 NDK `28.2.13676358` 버전이 필요합니다.
 
@@ -56,7 +71,7 @@ Android 앱 빌드에는 NDK `28.2.13676358` 버전이 필요합니다.
 3. **NDK (Side by side) > 28.2.13676358**을 선택하여 설치합니다.
 4. NDK 설치 중 `sdkmanager` 오류가 발생하면 **Android SDK Command-line Tools (latest)**도 설치하거나 재설치합니다.
 
-### 4. 앱 실행
+### 5. 앱 실행
 
 - 기본(개발 환경): `flutter run` 또는 `flutter run -t lib/main_dev.dart`
 - 로컬 백엔드: `flutter run -t lib/main_local.dart`
@@ -64,7 +79,7 @@ Android 앱 빌드에는 NDK `28.2.13676358` 버전이 필요합니다.
 
 `main.dart`는 현재 `backend_dev`를 사용하도록 되어 있을 수 있으므로, 필요 시 `lib/main.dart`에서 import하는 config를 변경하면 됩니다.
 
-### 5. Android 데모 APK 빌드
+### 6. Android 데모 APK 빌드
 
 개발 서버에 연결되는 데모 APK는 다음 명령으로 빌드합니다.
 
