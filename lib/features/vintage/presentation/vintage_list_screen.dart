@@ -15,6 +15,9 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../../block/presentation/block_member_dialog.dart';
+import '../../report/data/report.dart';
+import '../../report/presentation/report_dialog.dart';
 import '../data/vintage_shop.dart';
 import '../data/vintage_shop_detail.dart';
 
@@ -566,6 +569,25 @@ class _VintageListScreenState extends State<VintageListScreen> {
                                 }
                               }
                             },
+                            onReport: () => showReportDialog(
+                              context,
+                              targetType: ReportTargetType.vintageComment,
+                              targetId: c.commentId,
+                            ),
+                            onBlock: () async {
+                              final blocked = await showBlockMemberDialog(
+                                context,
+                                memberId: c.memberId,
+                                nickname: c.nickname,
+                              );
+                              if (!blocked || !context.mounted) return;
+                              final result = await _fetchShopDetail(
+                                d.vintageId,
+                              );
+                              if (context.mounted && result.detail != null) {
+                                setStateSB(() => updatedDetail = result.detail);
+                              }
+                            },
                           );
                         },
                       ),
@@ -672,6 +694,8 @@ class _VintageListScreenState extends State<VintageListScreen> {
     int? currentMemberId,
     Future<void> Function()? onEdit,
     Future<void> Function()? onDelete,
+    Future<void> Function()? onReport,
+    Future<void> Function()? onBlock,
   }) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -792,6 +816,31 @@ class _VintageListScreenState extends State<VintageListScreen> {
                           ),
                         ),
                     ],
+                    if (!isMine && (onReport != null || onBlock != null)) ...[
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        tooltip: '댓글 관리',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.more_horiz, size: 19),
+                        onSelected: (value) async {
+                          if (value == 'report') await onReport?.call();
+                          if (value == 'block') await onBlock?.call();
+                        },
+                        itemBuilder: (_) => [
+                          if (onReport != null)
+                            const PopupMenuItem(
+                              value: 'report',
+                              child: Text('댓글 신고'),
+                            ),
+                          if (onBlock != null)
+                            const PopupMenuItem(
+                              value: 'block',
+                              child: Text('사용자 차단'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -907,9 +956,7 @@ class _VintageListScreenState extends State<VintageListScreen> {
 
       final code = response.code ?? response.statusCode;
 
-      if (response.statusCode == 401 ||
-          code == 401 ||
-          response.statusCode == 403) {
+      if (response.statusCode == 401 || code == 401) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;

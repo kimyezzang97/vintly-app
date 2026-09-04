@@ -8,6 +8,9 @@ import '../../../app/app_routes.dart';
 import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
+import '../../block/presentation/block_member_dialog.dart';
+import '../../report/data/report.dart';
+import '../../report/presentation/report_dialog.dart';
 import '../data/board_api.dart';
 import '../data/board_api_paths.dart';
 import '../data/board_comment.dart';
@@ -142,21 +145,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return (null, null);
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return (null, null);
       }
 
       final success = response.json['success'] == true;
-      final businessOk =
-          apiCode == null || apiCode == 0 || apiCode == 200;
+      final businessOk = apiCode == null || apiCode == 0 || apiCode == 200;
       if (!success || !businessOk || response.statusCode != 200) {
-        return (
-          null,
-          response.msg ?? '게시글을 불러오지 못했습니다.',
-        );
+        return (null, response.msg ?? '게시글을 불러오지 못했습니다.');
       }
 
       final data = response.json['data'];
@@ -214,17 +212,13 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       );
       if (!mounted) return false;
       final apiCode = response.code;
-      if (response.statusCode == 401 ||
-          apiCode == 401 ||
-          response.statusCode == 403 ||
-          apiCode == 403) {
+      if (response.statusCode == 401 || apiCode == 401) {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return false;
       }
       if (!boardCommentMutationOk(response)) {
@@ -233,16 +227,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         );
         return false;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('댓글이 등록되었습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('댓글이 등록되었습니다.')));
       await _refreshBoardDetailSilently();
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 등록 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 등록 중 오류: $e')));
       }
       return false;
     }
@@ -266,10 +260,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return false;
       }
       if (!boardCommentMutationOk(response)) {
@@ -278,16 +271,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         );
         return false;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('댓글이 수정되었습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('댓글이 수정되었습니다.')));
       await _refreshBoardDetailSilently();
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 수정 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 수정 중 오류: $e')));
       }
       return false;
     }
@@ -310,10 +303,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return false;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return false;
       }
       if (!boardCommentMutationOk(response)) {
@@ -322,16 +314,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         );
         return false;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('댓글이 삭제되었습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('댓글이 삭제되었습니다.')));
       await _refreshBoardDetailSilently();
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('댓글 삭제 중 오류: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('댓글 삭제 중 오류: $e')));
       }
       return false;
     }
@@ -350,10 +342,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         ),
         title: const Text(
           '댓글 수정',
-          style: TextStyle(
-            color: _boardInk,
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(color: _boardInk, fontWeight: FontWeight.w800),
         ),
         content: TextField(
           controller: controller,
@@ -498,10 +487,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return;
       }
 
@@ -516,17 +504,17 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('게시글이 삭제되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('게시글이 삭제되었습니다.')));
         Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _deleteBusy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('게시글 삭제 중 오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('게시글 삭제 중 오류: $e')));
     }
   }
 
@@ -551,10 +539,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         await TokenStorage.clearAll();
         CurrentUserHolder.clear();
         if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.login,
-          (route) => false,
-        );
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         return;
       }
 
@@ -579,9 +566,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _likeBusy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('좋아요 처리 중 오류: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('좋아요 처리 중 오류: $e')));
     }
   }
 
@@ -591,11 +578,12 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     final baseUrl = AppConfig.instance.backend.baseUrl;
 
     final currentMid = CurrentUserHolder.memberId;
-    final showOwnerMenu = !_loading &&
+    final showPostMenu =
+        !_loading &&
         _errorMessage == null &&
         _detail != null &&
-        currentMid != null &&
-        _detail!.memberId == currentMid;
+        currentMid != null;
+    final isOwner = showPostMenu && _detail!.memberId == currentMid;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -604,188 +592,264 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
         statusBarBrightness: Brightness.light,
       ),
       child: Scaffold(
-      backgroundColor: _boardBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF35424A),
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          '커뮤니티',
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: _boardEspresso,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          if (showOwnerMenu)
-            PopupMenuButton<String>(
-              enabled: !_deleteBusy,
-              tooltip: '더보기',
-              padding: EdgeInsets.zero,
-              color: Colors.white,
-              elevation: 8,
-              shadowColor: const Color(0x26000000),
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFFE8E1DA)),
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 136,
-                maxWidth: 136,
-              ),
-              icon: _deleteBusy
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    )
-                  : const Icon(Icons.more_horiz),
-              onSelected: (value) async {
-                if (value == 'edit') {
-                  final d = _detail;
-                  if (!mounted || d == null) return;
-                  final ok = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute<bool>(
-                      builder: (_) => BoardCreateScreen(
-                        editBoardId: widget.boardId,
-                        initialTitle: d.title,
-                        initialContent: d.content,
-                        existingImages: List<BoardDetailImageRef>.from(
-                          d.imageRefs,
-                        ),
-                      ),
-                    ),
-                  );
-                  if (ok == true && mounted) await _load();
-                } else if (value == 'delete') {
-                  await _deleteBoard();
-                }
-              },
-              itemBuilder: (popupContext) => [
-                PopupMenuItem(
-                  value: 'edit',
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  height: 48,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                        color: const Color(0xFF35424A),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '수정',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: _boardInk,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(height: 1),
-                PopupMenuItem(
-                  value: 'delete',
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  height: 48,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      const Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                        color: Color(0xFFC94848),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '삭제',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFFC94848),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+        backgroundColor: _boardBackground,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF35424A),
+          surfaceTintColor: Colors.transparent,
+          title: Text(
+            '커뮤니티',
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: _boardEspresso,
+              fontWeight: FontWeight.w800,
             ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: const Color(0xFFD8CEC6),
           ),
-        ),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: _boardCaramel),
-            )
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyLarge,
+          actions: [
+            if (showPostMenu)
+              PopupMenuButton<String>(
+                enabled: !_deleteBusy,
+                tooltip: '더보기',
+                padding: EdgeInsets.zero,
+                color: Colors.white,
+                elevation: 8,
+                shadowColor: const Color(0x26000000),
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFE8E1DA)),
+                ),
+                constraints: const BoxConstraints(minWidth: 136, maxWidth: 136),
+                icon: _deleteBusy
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onSurface,
                         ),
-                        const SizedBox(height: 16),
-                            FilledButton(
-                              onPressed: _load,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF35424A),
+                      )
+                    : const Icon(Icons.more_horiz),
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    final d = _detail;
+                    if (!mounted || d == null) return;
+                    final ok = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute<bool>(
+                        builder: (_) => BoardCreateScreen(
+                          editBoardId: widget.boardId,
+                          initialTitle: d.title,
+                          initialContent: d.content,
+                          existingImages: List<BoardDetailImageRef>.from(
+                            d.imageRefs,
+                          ),
+                        ),
+                      ),
+                    );
+                    if (ok == true && mounted) await _load();
+                  } else if (value == 'delete') {
+                    await _deleteBoard();
+                  } else if (value == 'report') {
+                    await showReportDialog(
+                      context,
+                      targetType: ReportTargetType.board,
+                      targetId: widget.boardId,
+                    );
+                  } else if (value == 'block') {
+                    final detail = _detail;
+                    if (detail == null) return;
+                    final blocked = await showBlockMemberDialog(
+                      context,
+                      memberId: detail.memberId,
+                      nickname: detail.authorNickname,
+                    );
+                    if (blocked && context.mounted) {
+                      Navigator.of(context).pop(true);
+                    }
+                  }
+                },
+                itemBuilder: (popupContext) => isOwner
+                    ? [
+                        PopupMenuItem(
+                          value: 'edit',
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 0,
+                          ),
+                          height: 48,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              Icon(
+                                Icons.edit_outlined,
+                                size: 18,
+                                color: const Color(0xFF35424A),
                               ),
-                          child: const Text('다시 시도'),
+                              const SizedBox(width: 8),
+                              Text(
+                                '수정',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: _boardInk,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 1),
+                        PopupMenuItem(
+                          value: 'delete',
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 0,
+                          ),
+                          height: 48,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Color(0xFFC94848),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '삭제',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: const Color(0xFFC94848),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ]
+                    : [
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.flag_outlined,
+                                size: 18,
+                                color: theme.colorScheme.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '신고',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 1),
+                        PopupMenuItem(
+                          value: 'block',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.block_outlined,
+                                size: 18,
+                                color: theme.colorScheme.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '사용자 차단',
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-                )
-              : _detail == null
-                  ? const Center(child: Text('표시할 내용이 없습니다.'))
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: SingleChildScrollView(
-                        controller: _bodyScrollController,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                        child: _DetailBody(
-                          detail: _detail!,
-                          baseUrl: baseUrl,
-                          likeBusy: _likeBusy,
-                          onLikeTap: _toggleLike,
-                          onScrollToCommentInput: _scrollToCommentInput,
-                          onPostComment: _postBoardComment,
-                          onEditComment: (c) async {
-                            final text =
-                                await _showEditBoardCommentDialog(c.content);
-                            if (text == null || !mounted) return false;
-                            return _putBoardComment(c.commentId, text);
-                          },
-                          onDeleteComment: (c) async {
-                            final ok = await _confirmDeleteBoardComment();
-                            if (!ok || !mounted) return false;
-                            return _deleteBoardComment(c.commentId);
-                          },
-                        ),
+              ),
+          ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: const Color(0xFFD8CEC6),
+            ),
+          ),
+        ),
+        body: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: _boardCaramel),
+              )
+            : _errorMessage != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge,
                       ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: _load,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF35424A),
+                        ),
+                        child: const Text('다시 시도'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : _detail == null
+            ? const Center(child: Text('표시할 내용이 없습니다.'))
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  controller: _bodyScrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  child: _DetailBody(
+                    detail: _detail!,
+                    baseUrl: baseUrl,
+                    likeBusy: _likeBusy,
+                    onLikeTap: _toggleLike,
+                    onScrollToCommentInput: _scrollToCommentInput,
+                    onPostComment: _postBoardComment,
+                    onEditComment: (c) async {
+                      final text = await _showEditBoardCommentDialog(c.content);
+                      if (text == null || !mounted) return false;
+                      return _putBoardComment(c.commentId, text);
+                    },
+                    onDeleteComment: (c) async {
+                      final ok = await _confirmDeleteBoardComment();
+                      if (!ok || !mounted) return false;
+                      return _deleteBoardComment(c.commentId);
+                    },
+                    onReportComment: (c) => showReportDialog(
+                      context,
+                      targetType: ReportTargetType.boardComment,
+                      targetId: c.commentId,
                     ),
+                    onBlockCommentAuthor: (c) async {
+                      final blocked = await showBlockMemberDialog(
+                        context,
+                        memberId: c.memberId,
+                        nickname: c.nickname,
+                      );
+                      if (blocked && mounted) {
+                        await _refreshBoardDetailSilently();
+                      }
+                    },
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -801,6 +865,8 @@ class _DetailBody extends StatelessWidget {
     required this.onPostComment,
     required this.onEditComment,
     required this.onDeleteComment,
+    required this.onReportComment,
+    required this.onBlockCommentAuthor,
   });
 
   final BoardDetail detail;
@@ -808,9 +874,12 @@ class _DetailBody extends StatelessWidget {
   final bool likeBusy;
   final VoidCallback onLikeTap;
   final VoidCallback onScrollToCommentInput;
-  final Future<bool> Function(String comment, int parentCommentId) onPostComment;
+  final Future<bool> Function(String comment, int parentCommentId)
+  onPostComment;
   final Future<bool> Function(BoardComment c) onEditComment;
   final Future<bool> Function(BoardComment c) onDeleteComment;
+  final Future<void> Function(BoardComment c) onReportComment;
+  final Future<void> Function(BoardComment c) onBlockCommentAuthor;
 
   @override
   Widget build(BuildContext context) {
@@ -864,9 +933,7 @@ class _DetailBody extends StatelessWidget {
               const Text('·', style: TextStyle(color: Color(0xFFB6AAA2))),
               Text(
                 _formatBoardDetailDate(detail.createdAt),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: _boardMuted,
-                ),
+                style: theme.textTheme.bodySmall?.copyWith(color: _boardMuted),
               ),
             ],
           ),
@@ -875,9 +942,7 @@ class _DetailBody extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 '수정 ${_formatBoardDetailDate(detail.updatedAt)}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: _boardMuted,
-                ),
+                style: theme.textTheme.labelSmall?.copyWith(color: _boardMuted),
               ),
             ),
           if (detail.imgList.isNotEmpty) ...[
@@ -1000,6 +1065,8 @@ class _DetailBody extends StatelessWidget {
             onPostComment: onPostComment,
             onEditComment: onEditComment,
             onDeleteComment: onDeleteComment,
+            onReportComment: onReportComment,
+            onBlockCommentAuthor: onBlockCommentAuthor,
           ),
         ],
       ),
@@ -1014,13 +1081,18 @@ class _BoardCommentSection extends StatefulWidget {
     required this.onPostComment,
     required this.onEditComment,
     required this.onDeleteComment,
+    required this.onReportComment,
+    required this.onBlockCommentAuthor,
   });
 
   final List<BoardComment> comments;
   final VoidCallback onScrollToCommentInput;
-  final Future<bool> Function(String comment, int parentCommentId) onPostComment;
+  final Future<bool> Function(String comment, int parentCommentId)
+  onPostComment;
   final Future<bool> Function(BoardComment c) onEditComment;
   final Future<bool> Function(BoardComment c) onDeleteComment;
+  final Future<void> Function(BoardComment c) onReportComment;
+  final Future<void> Function(BoardComment c) onBlockCommentAuthor;
 
   @override
   State<_BoardCommentSection> createState() => _BoardCommentSectionState();
@@ -1053,11 +1125,13 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
     int cmpTime(BoardComment a, BoardComment b) =>
         a.createdAt.compareTo(b.createdAt);
 
-    final tops = all.where((c) => c.parentCommentId == 0).toList()..sort(cmpTime);
+    final tops = all.where((c) => c.parentCommentId == 0).toList()
+      ..sort(cmpTime);
     for (final p in tops) {
       out.add((c: p, isReply: false));
-      final replies = all.where((c) => c.parentCommentId == p.commentId).toList()
-        ..sort(cmpTime);
+      final replies =
+          all.where((c) => c.parentCommentId == p.commentId).toList()
+            ..sort(cmpTime);
       for (final r in replies) {
         out.add((c: r, isReply: true));
       }
@@ -1157,24 +1231,19 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
             decoration: BoxDecoration(
               color: const Color(0xFFF7F6F4),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFE8E1DA),
-              ),
+              border: Border.all(color: const Color(0xFFE8E1DA)),
             ),
             alignment: Alignment.center,
             child: Text(
               '아직 댓글이 없습니다.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: _boardMuted,
-              ),
+              style: theme.textTheme.bodyMedium?.copyWith(color: _boardMuted),
             ),
           )
         else
           ...flat.map((e) {
             final c = e.c;
             final isReply = e.isReply;
-            final isMine =
-                currentMid != null && c.memberId == currentMid;
+            final isMine = currentMid != null && c.memberId == currentMid;
             return _BoardCommentTile(
               comment: c,
               isReply: isReply,
@@ -1196,6 +1265,16 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
                       await widget.onDeleteComment(c);
                     }
                   : null,
+              onReport: isMine
+                  ? null
+                  : () async {
+                      await widget.onReportComment(c);
+                    },
+              onBlock: isMine
+                  ? null
+                  : () async {
+                      await widget.onBlockCommentAuthor(c);
+                    },
             );
           }),
         const SizedBox(height: 16),
@@ -1216,9 +1295,7 @@ class _BoardCommentSectionState extends State<_BoardCommentSection> {
                     textInputAction: TextInputAction.newline,
                     enabled: !_submitting,
                     decoration: InputDecoration(
-                      hintText: _replyingTo != null
-                          ? '답글을 입력하세요'
-                          : '댓글을 입력하세요',
+                      hintText: _replyingTo != null ? '답글을 입력하세요' : '댓글을 입력하세요',
                       hintStyle: TextStyle(
                         color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                       ),
@@ -1268,6 +1345,8 @@ class _BoardCommentTile extends StatelessWidget {
     this.onReply,
     this.onEdit,
     this.onDelete,
+    this.onReport,
+    this.onBlock,
   });
 
   final BoardComment comment;
@@ -1277,13 +1356,14 @@ class _BoardCommentTile extends StatelessWidget {
   final VoidCallback? onReply;
   final Future<void> Function()? onEdit;
   final Future<void> Function()? onDelete;
+  final Future<void> Function()? onReport;
+  final Future<void> Function()? onBlock;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final nick =
-        comment.nickname.isNotEmpty ? comment.nickname : '익명';
+    final nick = comment.nickname.isNotEmpty ? comment.nickname : '익명';
     final initial = nick.isNotEmpty ? nick[0].toUpperCase() : '?';
 
     return Padding(
@@ -1370,8 +1450,7 @@ class _BoardCommentTile extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 '답글',
-                                style:
-                                    theme.textTheme.labelSmall?.copyWith(
+                                style: theme.textTheme.labelSmall?.copyWith(
                                   color: _boardCaramel,
                                 ),
                               ),
@@ -1386,11 +1465,8 @@ class _BoardCommentTile extends StatelessWidget {
                         TextButton(
                           style: TextButton.styleFrom(
                             minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                            ),
-                            tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             foregroundColor: cs.outline,
                           ),
                           onPressed: () => onEdit!(),
@@ -1405,11 +1481,8 @@ class _BoardCommentTile extends StatelessWidget {
                         TextButton(
                           style: TextButton.styleFrom(
                             minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                            ),
-                            tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           onPressed: () => onDelete!(),
                           child: Text(
@@ -1419,6 +1492,31 @@ class _BoardCommentTile extends StatelessWidget {
                             ),
                           ),
                         ),
+                    ],
+                    if (!isMine && (onReport != null || onBlock != null)) ...[
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        tooltip: '댓글 관리',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.more_horiz, size: 19),
+                        onSelected: (value) async {
+                          if (value == 'report') await onReport?.call();
+                          if (value == 'block') await onBlock?.call();
+                        },
+                        itemBuilder: (_) => [
+                          if (onReport != null)
+                            const PopupMenuItem(
+                              value: 'report',
+                              child: Text('댓글 신고'),
+                            ),
+                          if (onBlock != null)
+                            const PopupMenuItem(
+                              value: 'block',
+                              child: Text('사용자 차단'),
+                            ),
+                        ],
+                      ),
                     ],
                   ],
                 ),
@@ -1453,10 +1551,7 @@ class _BoardCommentTile extends StatelessWidget {
 
 /// 인스타그램 피드처럼 정사각형 미디어 영역을 고정하고, 이미지가 없으면 플레이스홀더만 표시합니다.
 class _BoardDetailMediaArea extends StatefulWidget {
-  const _BoardDetailMediaArea({
-    required this.rawPaths,
-    required this.baseUrl,
-  });
+  const _BoardDetailMediaArea({required this.rawPaths, required this.baseUrl});
 
   final List<String> rawPaths;
   final String baseUrl;
@@ -1543,7 +1638,9 @@ class _BoardDetailMediaAreaState extends State<_BoardDetailMediaArea> {
                     loadingBuilder: (context, child, progress) {
                       if (progress == null) return child;
                       return ColoredBox(
-                        color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                        color: cs.surfaceContainerHighest.withValues(
+                          alpha: 0.35,
+                        ),
                         child: const Center(
                           child: SizedBox(
                             width: 32,

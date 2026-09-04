@@ -9,6 +9,8 @@ import '../../../shared/api/authenticated_api.dart';
 import '../../../shared/auth/current_user.dart';
 import '../../../shared/auth/token_storage.dart';
 import '../../../shared/legal/legal_links.dart';
+import '../../block/presentation/blocked_members_screen.dart';
+import '../../report/presentation/my_reports_screen.dart';
 
 const double _mypageDialogRadius = 22;
 const Color _mypageInk = Color(0xFF241A17);
@@ -212,6 +214,34 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           icon: Icons.lock_outline_rounded,
                           label: '비밀번호 변경',
                           onTap: () => _showChangePasswordDialog(context),
+                        ),
+                        const Divider(
+                          height: 1,
+                          indent: 56,
+                          color: Color(0xFFE8E1DA),
+                        ),
+                        _MenuItem(
+                          icon: Icons.flag_outlined,
+                          label: '내 신고 내역',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const MyReportsScreen(),
+                            ),
+                          ),
+                        ),
+                        const Divider(
+                          height: 1,
+                          indent: 56,
+                          color: Color(0xFFE8E1DA),
+                        ),
+                        _MenuItem(
+                          icon: Icons.block_outlined,
+                          label: '차단한 사용자',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const BlockedMembersScreen(),
+                            ),
+                          ),
                         ),
                         const Divider(
                           height: 1,
