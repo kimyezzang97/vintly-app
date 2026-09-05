@@ -101,9 +101,25 @@ build/app/outputs/flutter-apk/app-release.apk
 
 생성된 APK를 USB, 클라우드 드라이브 또는 메신저 등으로 Android 휴대폰에 옮긴 뒤 파일을 눌러 설치합니다. 처음 설치할 때는 휴대폰 설정에서 APK를 연 앱에 대해 `출처를 알 수 없는 앱 설치` 권한을 허용해야 할 수 있습니다.
 
-- 실제 휴대폰에서 네이버 지도를 사용하려면 네이버 클라우드 Maps에 현재 Android 패키지명 `com.example.vintly_app`이 등록되어 있어야 합니다.
+- 실제 휴대폰에서 네이버 지도를 사용하려면 네이버 클라우드 Maps에 현재 Android 패키지명 `com.vintly.app`이 등록되어 있어야 합니다.
 - 로컬 백엔드 빌드는 `localhost` 대신 휴대폰에서 접근할 수 있는 PC의 내부 IP를 사용하고, 휴대폰과 PC를 같은 네트워크에 연결해야 합니다.
-- 현재 release 빌드는 debug 키로 서명되므로 내부 데모 설치에는 사용할 수 있지만 스토어 배포용으로 사용하면 안 됩니다.
+- release 빌드는 `android/key.properties`에 설정한 업로드 키로 서명됩니다.
+
+### 7. Google Play 등록용 AAB 빌드
+
+운영 서버에 연결되는 Google Play 등록용 Android App Bundle(AAB)은 다음 명령으로 빌드합니다.
+
+```bash
+flutter build appbundle --release -t lib/main_prd.dart
+```
+
+빌드가 완료되면 아래 파일을 Google Play Console에 업로드합니다.
+
+```text
+build/app/outputs/bundle/release/app-release.aab
+```
+
+이미 사용한 버전 코드는 다시 업로드할 수 없습니다. 새 빌드 전에 `pubspec.yaml`의 `version`에서 `+` 뒤 숫자를 기존에 업로드한 최대 버전 코드보다 크게 변경합니다. 예를 들어 `1.0.0+3`의 버전 코드는 `3`입니다.
 
 ## 프로젝트 구조 (요약)
 
