@@ -10,6 +10,14 @@
 - **좋아요** – 좋아요 토글 (POST/DELETE)
 - **댓글·대댓글** – 댓글 작성 및 답글(대댓글) 작성
 
+## 앱 화면
+
+| 빈티지 숍 지도 | 매장 상세 | 커뮤니티 | 마이·계정 관리 |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/안드로이드-출시/store-assets/screenshots/01_vintage_map.jpg" alt="빈티지 숍 지도와 매장 마커" width="200"> | <img src="docs/안드로이드-출시/store-assets/screenshots/02_shop_detail.jpg" alt="매장 이미지, 주소, 좋아요와 댓글" width="200"> | <img src="docs/안드로이드-출시/store-assets/screenshots/03_community.jpg" alt="커뮤니티 검색과 게시글 목록" width="200"> | <img src="docs/안드로이드-출시/store-assets/screenshots/04_safety_and_account.jpg" alt="내 신고 내역, 차단한 사용자와 계정 관리 메뉴" width="200"> |
+
+스크린샷과 스토어 등록용 그래픽은 [스토어 이미지 안내](docs/안드로이드-출시/store-assets/README.md)에서 확인할 수 있습니다.
+
 ## 기술 스택
 
 - **Flutter** 3.x, **Dart** ^3.11.0
